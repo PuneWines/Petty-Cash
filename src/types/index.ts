@@ -29,11 +29,11 @@ export interface Transaction {
   transactionStatus: string;
   date: string;
   user?: string; // Optional for mock data
-  amount:number;
-  sheetName:string;
-  remarks:string;
-  description:string;
-  category:string;
+  amount: number;
+  sheetName: string;
+  remarks: string;
+  description: string;
+  category: string;
   name?: string; // Optional name field
 }
 

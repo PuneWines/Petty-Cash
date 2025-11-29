@@ -532,22 +532,37 @@ export default function Dashboard() {
   useEffect(() => {
     if (!currentUser) return;
 
-    let sheetName;
-    if (activeTab === "patty") {
-      sheetName = "Patty Expence";
-      fetchTransactions(sheetName);
-      fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role);
-    } else {
-      if (selectedTallySheet === "All") {
-        const sheetsToFetch = tallySheets.filter(s => s !== "All");
-        fetchTransactions(sheetsToFetch);
-        fetchMultipleTallyStats(sheetsToFetch, currentUser.name, currentUser.role);
-      } else {
-        sheetName = selectedTallySheet;
-        fetchTransactions(sheetName);
-        fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        let sheetName;
+        if (activeTab === "patty") {
+          sheetName = "Patty Expence";
+          await Promise.all([
+            fetchTransactions(sheetName),
+            fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role)
+          ]);
+        } else {
+          if (selectedTallySheet === "All") {
+            const sheetsToFetch = tallySheets.filter(s => s !== "All");
+            await Promise.all([
+              fetchTransactions(sheetsToFetch),
+              fetchMultipleTallyStats(sheetsToFetch, currentUser.name, currentUser.role)
+            ]);
+          } else {
+            sheetName = selectedTallySheet;
+            await Promise.all([
+              fetchTransactions(sheetName),
+              fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role)
+            ]);
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    loadData();
   }, [activeTab, selectedTallySheet, currentUser]);
   const fetchTransactions = async (sheetNames: string | string[]) => {
     setIsLoading(true);
@@ -628,8 +643,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error:", error);
       setTransactions([]);
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -77,7 +77,7 @@ function MainApp() {
         />
         <main className="p-4 pb-20 md:p-6">{renderPage()}</main>
       </div>
-      
+
 
       <Footer />
     </div>

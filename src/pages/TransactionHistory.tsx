@@ -421,52 +421,52 @@ export default function TransactionHistory() {
 
 
 
-const fetchPettyCashTransactions = async () => {
-  try {
-    console.log("Fetching petty cash transactions...");
-    const url = `${SHEET_URL}?action=getSheetData&sheetId=${SHEET_ID}&sheetName=${encodeURIComponent("Patty Expence")}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const data = await res.json();
-    console.log("Petty cash data received:", data);
-    if (data.success && Array.isArray(data.data)) {
-      setTransactions(data.data);
-      localStorage.setItem("pettyCashTransactions", JSON.stringify(data.data));
-    } else {
-      console.error("Invalid petty cash data format", data);
+  const fetchPettyCashTransactions = async () => {
+    try {
+      console.log("Fetching petty cash transactions...");
+      const url = `${SHEET_URL}?action=getSheetData&sheetId=${SHEET_ID}&sheetName=${encodeURIComponent("Patty Expence")}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      console.log("Petty cash data received:", data);
+      if (data.success && Array.isArray(data.data)) {
+        setTransactions(data.data);
+        localStorage.setItem("pettyCashTransactions", JSON.stringify(data.data));
+      } else {
+        console.error("Invalid petty cash data format", data);
+        setTransactions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching petty cash transactions:", error);
       setTransactions([]);
     }
-  } catch (error) {
-    console.error("Error fetching petty cash transactions:", error);
-    setTransactions([]);
-  }
-};
+  };
 
-const fetchCashTallyEntries = async () => {
-  try {
-    console.log("Fetching cash tally entries from all counters...");
-    const counters = ["Cash Tally Counter 1", "Cash Tally Counter 2", "Cash Tally Counter 3"];
-    const allEntries: any[] = [];
-    for (const counter of counters) {
-      const url = `${SHEET_URL}?action=getSheetData&sheetId=${SHEET_ID}&sheetName=${encodeURIComponent(counter)}`;
-      console.log("Fetching from URL: ", url);
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status} for ${counter}`);
-      const data = await res.json();
-      console.log(`Data received from ${counter}:`, data);
-      if (data.success && Array.isArray(data.data)) {
-        allEntries.push(...data.data);
-      } else {
-        console.error(`Invalid data format for ${counter}`, data);
+  const fetchCashTallyEntries = async () => {
+    try {
+      console.log("Fetching cash tally entries from all counters...");
+      const counters = ["Cash Tally Counter 1", "Cash Tally Counter 2", "Cash Tally Counter 3"];
+      const allEntries: any[] = [];
+      for (const counter of counters) {
+        const url = `${SHEET_URL}?action=getSheetData&sheetId=${SHEET_ID}&sheetName=${encodeURIComponent(counter)}`;
+        console.log("Fetching from URL: ", url);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status} for ${counter}`);
+        const data = await res.json();
+        console.log(`Data received from ${counter}:`, data);
+        if (data.success && Array.isArray(data.data)) {
+          allEntries.push(...data.data);
+        } else {
+          console.error(`Invalid data format for ${counter}`, data);
+        }
       }
+      setCashTallyEntries(allEntries);
+      localStorage.setItem("cashTallyEntries", JSON.stringify(allEntries));
+    } catch (error) {
+      console.error("Error fetching cash tally entries:", error);
+      setCashTallyEntries([]);
     }
-    setCashTallyEntries(allEntries);
-    localStorage.setItem("cashTallyEntries", JSON.stringify(allEntries));
-  } catch (error) {
-    console.error("Error fetching cash tally entries:", error);
-    setCashTallyEntries([]);
-  }
-};
+  };
 
 
 
@@ -558,21 +558,19 @@ const fetchCashTallyEntries = async () => {
           <div className="flex border-b border-gray-200 mb-6">
             <button
               onClick={() => setActiveTab("petty-cash")}
-              className={`px-6 py-3 font-medium text-sm transition-colors ${
-                activeTab === "petty-cash"
+              className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === "petty-cash"
                   ? "border-b-2 border-[#2a5298] text-[#2a5298]"
                   : "text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
             >
               Petty Cash History
             </button>
             <button
               onClick={() => setActiveTab("cash-tally")}
-              className={`px-6 py-3 font-medium text-sm transition-colors ${
-                activeTab === "cash-tally"
+              className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === "cash-tally"
                   ? "border-b-2 border-[#2a5298] text-[#2a5298]"
                   : "text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
             >
               Cash Tally History
             </button>
