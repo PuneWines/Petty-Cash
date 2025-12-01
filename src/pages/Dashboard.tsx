@@ -923,6 +923,7 @@ export default function Dashboard() {
         onTallyOptionChange={setSelectedTallySheet}
         isLoading={isLoading}
       />
+      <br/>
     </div>
   );
 }

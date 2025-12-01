@@ -52,7 +52,8 @@ export default function TransactionTable({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Tabs & Dropdown on table header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-6 border-b"> {/* p-4 to p-6 */}
+
         <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden">
           <button
             className={`px-4 py-2 text-sm font-medium ${
