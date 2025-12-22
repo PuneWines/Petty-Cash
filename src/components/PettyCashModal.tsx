@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Toast from "./Toast";
 import {
   FaTimes,
   FaWallet,
@@ -108,6 +109,7 @@ export default function PettyCashModal({
   const [isLoading, setIsLoading] = useState(false);
   const [fetchedUsers, setFetchedUsers] = useState<string[]>([]);
   const [showMiscRemarks, setShowMiscRemarks] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
   useEffect(() => {
@@ -380,18 +382,20 @@ export default function PettyCashModal({
 
         if (!result.success) {
           console.error("Error:", result.error);
-          alert("Failed to save data: " + result.error);
+          setToast({ message: "Failed to save data: " + result.error, type: "error" });
           setIsLoading(false);
           return;
         }
       }
 
-      alert(`Data saved successfully! ${rowsToSubmit.length} row(s) submitted.`);
-      onClose();
+      setToast({ message: `Data saved successfully! ${rowsToSubmit.length} row(s) submitted.`, type: "success" });
+      setTimeout(() => {
+        onClose();
+        setIsLoading(false);
+      }, 1000);
     } catch (error) {
       console.error("Error submitting form:", error);
-      alert("Error submitting form. Please try again.");
-    } finally {
+      setToast({ message: "Error submitting form. Please try again.", type: "error" });
       setIsLoading(false);
     }
   };
@@ -1160,6 +1164,13 @@ export default function PettyCashModal({
           </div>
         </form>
       </div>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

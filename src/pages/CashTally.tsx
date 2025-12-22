@@ -2,6 +2,7 @@
 
 
 import { useState, useEffect } from "react";
+import Toast from "../components/Toast";
 import { FaTimes, FaUser, FaShoppingCart, FaTruck, FaPlus } from "react-icons/fa";
 
 interface CashTallyProps {
@@ -62,6 +63,7 @@ export default function CashTally({
   const [totalAmount, setTotalAmount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState<string[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
   const fetchEmployees = async () => {
@@ -318,16 +320,19 @@ export default function CashTally({
           );
         }
 
-        onClose();
-        alert("Data saved successfully!");
+        setToast({ message: "Data saved successfully!", type: "success" });
+        setTimeout(() => {
+          onClose();
+          setIsLoading(false);
+        }, 1000);
       } else {
         console.error("Error:", result.error);
-        alert("Failed to save data: " + result.error);
+        setToast({ message: "Failed to save data: " + result.error, type: "error" });
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      alert("Error submitting form. Please try again.");
-    } finally {
+      setToast({ message: "Error submitting form. Please try again.", type: "error" });
       setIsLoading(false);
     }
   };
@@ -944,6 +949,13 @@ export default function CashTally({
           </div>
         </form>
       </div>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
