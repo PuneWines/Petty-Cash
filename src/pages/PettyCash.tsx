@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import PettyCashModal from '../components/PettyCashModal';
 import { Transaction } from '../types';
+import { CategoryAmounts } from '../components/PettyCashModal';
 
 interface PettyCashProps {
   onClose?: () => void;
@@ -11,7 +12,7 @@ export default function PettyCash({ onClose = () => {} }: PettyCashProps) {
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const handleSaveTransaction = (formData: Transaction) => {
+  const handleSaveTransaction = (formData: any) => {
     const transactionId = formData.id || `TXN-${Date.now()}`;
     const newTransaction: Transaction = {
       ...formData,

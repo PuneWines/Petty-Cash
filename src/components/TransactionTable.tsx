@@ -1,12 +1,7 @@
 import { FaClock } from 'react-icons/fa';
 import { Transaction } from '../types';
 
-const TALLY_SHEET_OPTIONS = [
-  { label: "All Tally Counters", sheet: "All" },
-  { label: "Cash Tally Counter 1", sheet: "Cash Tally Counter 1" },
-  { label: "Cash Tally Counter 2", sheet: "Cash Tally Counter 2" },
-  { label: "Cash Tally Counter 3", sheet: "Cash Tally Counter 3" },
-];
+
 
 
 interface TransactionTableProps {
@@ -27,13 +22,9 @@ interface TransactionTableProps {
 
 export default function TransactionTable({
   transactions,
- 
-  activeTab,
-  onTabChange,
-  selectedTallyOption,
-  onTallyOptionChange,
   isLoading,
 }: TransactionTableProps) {
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -51,46 +42,7 @@ export default function TransactionTable({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      {/* Tabs & Dropdown on table header */}
-      <div className="flex items-center justify-between p-6 border-b"> {/* p-4 to p-6 */}
-
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden">
-          <button
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "patty"
-                ? "bg-blue-500 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
-            onClick={() => onTabChange("patty")}
-          >
-            Patty Cash
-          </button>
-          <button
-            className={`px-4 py-2 text-sm font-medium border-l border-gray-200 ${
-              activeTab === "tally"
-                ? "bg-blue-500 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
-            onClick={() => onTabChange("tally")}
-          >
-            Tally Cash
-          </button>
-        </div>
-        {activeTab === "tally" && (
-          <select
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={selectedTallyOption}
-            onChange={(e) => onTallyOptionChange(e.target.value)}
-          >
-            {TALLY_SHEET_OPTIONS.map((option) => (
-              <option key={option.sheet} value={option.sheet}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
+      
       <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
         <h3 className="text-lg font-bold text-gray-800">Transaction History</h3>
         <p className="text-sm text-gray-600 mt-1">
@@ -100,9 +52,9 @@ export default function TransactionTable({
 
       <div className="overflow-x-auto">
         {isLoading ? (
-          <div className="flex justify-center items-center py-10">
+          <div className="flex flex-col justify-center items-center py-10">
             <svg
-              className="animate-spin h-8 w-8 text-[#2a5298] mx-auto"
+              className="animate-spin h-8 w-8 text-[#2a5298] mb-3"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -121,7 +73,7 @@ export default function TransactionTable({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span className="ml-4 text-gray-500 text-lg">Loading transactions...</span>
+            <span className="text-gray-500 text-lg font-medium">Loading transactions...</span>
           </div>
         ) : (
           <table className="w-full">

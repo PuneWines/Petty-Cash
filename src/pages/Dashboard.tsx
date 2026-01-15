@@ -369,18 +369,104 @@ import {
   FaMoneyBillWave,
   FaChartLine,
   FaCalendar,
+  FaFilePdf,
+  FaFileExcel,
 } from "react-icons/fa";
 import TransactionTable from "../components/TransactionTable";
 import { Transaction } from "../types";
+import { useAuth } from "../contexts/AuthContext";
+import * as XLSX from 'xlsx';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+const CountUpAnimation = ({ end, isLoading = false, duration = 2000 }: { end: number; isLoading?: boolean; duration?: number }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (isLoading) {
+      const interval = setInterval(() => {
+         setCount(Math.floor(Math.random() * (end > 0 ? end : 100000)));
+      }, 50);
+      return () => clearInterval(interval);
+    } 
+    setCount(0);
+  }, [isLoading, end]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    let startTimestamp: number | null = null;
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const easedProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setCount(easedProgress * end);
+      if (progress < 1) window.requestAnimationFrame(step);
+    };
+    window.requestAnimationFrame(step);
+  }, [end, duration, isLoading]);
+
+  return (
+    <>
+      {formatCurrency(Math.round(count))}
+    </>
+  );
+};
+
+interface SummaryRow {
+  id: number;
+  date: string;
+  voucherNo: string;
+  balance: string | number;
+  dailyExpenses: string | number;
+  maintenance: string | number;
+  fuel: string | number;
+  otherExpenses: string | number;
+  payments: string | number;
+}
+
+interface TallySummaryRow {
+  id: number;
+  counterName: string;
+  date: string;
+  retailAmt?: string | number;
+  wsaleAmt?: string | number;
+  homeDelivery?: string | number;
+  scanAmount?: string | number;
+  expenses?: string | number;
+  card: string | number;
+  paytm: string | number;
+  gpay: string | number;
+  phonePe?: string | number;
+  phonePay?: string | number;
+  cash: string | number;
+  diff: string | number;
+}
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  
+  // Cache States (Hoisted)
+  const [rawData, setRawData] = useState<Array<{ sheet: string, data: any[] }>>([]);
+  const [sheetCache, setSheetCache] = useState<Record<string, any[]>>({});
+  const [summaryCache, setSummaryCache] = useState<any[] | null>(null);
 
   // Stats from sheet row 1 (top red text row)
   const [openingBalance, setOpeningBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [pettyPdfData, setPettyPdfData] = useState<SummaryRow[]>([]);
+  const [tallyPdfData, setTallyPdfData] = useState<TallySummaryRow[]>([]);
 
   const [monthlyBudget, setMonthlyBudget] = useState(() => {
     const savedBudget = localStorage.getItem("monthlyBudget");
@@ -402,260 +488,84 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const [selectedTallySheet, setSelectedTallySheet] = useState<string>("All");
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch(`${scriptUrl}?action=getCurrentUser`);
-        const result = await response.json();
-        if (result.success) {
-          setCurrentUser({ name: result.name, role: result.role });
-        }
-      } catch (error) {
-        console.error("Error fetching current user:", error);
-      }
-    };
-    fetchCurrentUser();
-  }, []);
+  
+  const { user: currentUser } = useAuth();
 
   const scriptUrl =
     "https://script.google.com/macros/s/AKfycbx5dryxS1R5zp6myFfUlP1QPimufTqh5hcPcFMNcAJ-FiC-hyQL9mCkgHSbLkOiWTibeg/exec";
 
-  const fetchStatsAndExpenses = async (sheetName: string, userName: string | null = null, userRole: string | null = null, month: string) => {
-    try {
-      const dataRes = await fetch(
-        `${scriptUrl}?sheet=${encodeURIComponent(sheetName)}&action=fetch`
-      );
-      const dataJson = await dataRes.json();
+  // --- Summary Data State & Effect (Moved up to avoid Hook errors) ---
 
-      if (dataJson.success && dataJson.data) {
-        let openingBal = 0;
-        let expensesSum = 0;
-        let filteredRows = dataJson.data;
 
-        // ONLY filter if NOT admin
-        if (userRole && userRole.toLowerCase() !== 'admin' && userName) {
-          const userNameLower = userName.trim().toLowerCase();
+  const [pettySummaryData, setPettySummaryData] = useState<SummaryRow[]>([]);
+  const [tallySummaryData, setTallySummaryData] = useState<TallySummaryRow[]>([]);
+  const [summaryStartDate, setSummaryStartDate] = useState(""); // YYYY-MM-DD
+  const [summaryEndDate, setSummaryEndDate] = useState(""); // YYYY-MM-DD
 
-          if (sheetName === 'Patty Expence') {
-            filteredRows = dataJson.data.filter(row =>
-              row[27] && row[27].toString().trim().toLowerCase() === userNameLower
-            );
-          } else {
-            filteredRows = dataJson.data.filter(row =>
-              row[3] && row[3].toString().trim().toLowerCase() === userNameLower
-            );
-          }
-        }
-        // Admin ke liye NO filter - sab rows calculate hongi
-
-        // Calculate stats
-        for (const row of filteredRows) {
-          // Filter by Month (assuming row[2] is YYYY-MM-DD)
-          const rowDate = row[2] ? row[2].toString() : "";
-          if (!rowDate.startsWith(month)) continue;
-
-          openingBal += parseFloat(row[3]) || 0;
-          for (let i = 5; i <= 25; i++) {
-            expensesSum += parseFloat(row[i]) || 0;
-          }
-        }
-
-        setOpeningBalance(openingBal);
-        setTotalExpenses(expensesSum);
-        setClosingBalance(openingBal - expensesSum);
-      } else {
-        setOpeningBalance(0);
-        setTotalExpenses(0);
-        setClosingBalance(0);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      setOpeningBalance(0);
-      setTotalExpenses(0);
-      setClosingBalance(0);
-    }
+  // --- Data Processing Helpers ---
+  const parseNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (val === null || val === undefined) return 0;
+    const str = val.toString().replace(/[^0-9.-]/g, '');
+    return parseFloat(str) || 0;
   };
 
-
-  useEffect(() => {
-    const userName = localStorage.getItem('currentUserName');
-    const userRole = localStorage.getItem('currentUserRole');
-
-    // console.log("=== Dashboard User Check ===");
-    console.log("Username from localStorage:", userName);
-    console.log("Role from localStorage:", userRole);
-
-    if (userName && userRole) {
-      setCurrentUser({ name: userName, role: userRole });
-    } else {
-      // console.error("User not found in localStorage!");
+  const normalizeToISO = (dateString: string) => {
+    if (!dateString) return "";
+    let dateStr = dateString.toString().trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+    const parts = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (parts) {
+        let day = parseInt(parts[1]);
+        let month = parseInt(parts[2]);
+        let year = parseInt(parts[3]);
+        if (year < 100) year += 2000;
+        return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     }
-  }, []);
-
-  const fetchMultipleTallyStats = async (sheets: string[], userName: string | null, userRole: string | null, month: string) => {
-    let totalOpeningBal = 0;
-    let totalExpensesSum = 0;
-
-    try {
-      const userNameLower = userName ? userName.trim().toLowerCase() : '';
-
-      for (const sheet of sheets) {
-        const dataRes = await fetch(
-          `${scriptUrl}?sheet=${encodeURIComponent(sheet)}&action=fetch`
-        );
-        const dataJson = await dataRes.json();
-
-        if (dataJson.success && dataJson.data) {
-          let filteredRows = dataJson.data;
-
-          // ONLY filter if NOT admin
-          if (userRole && userRole.toLowerCase() !== 'admin' && userName) {
-            filteredRows = dataJson.data.filter(row =>
-              row[3] && row[3].toString().trim().toLowerCase() === userNameLower
-            );
-          }
-          // Admin ke liye NO filter
-
-          for (const row of filteredRows) {
-            // Filter by Month
-            const rowDate = row[2] ? row[2].toString() : "";
-            if (!rowDate.startsWith(month)) continue;
-
-            totalOpeningBal += parseFloat(row[3]) || 0;
-            for (let i = 5; i <= 25; i++) {
-              totalExpensesSum += parseFloat(row[i]) || 0;
-            }
-          }
-        }
-      }
-
-      setOpeningBalance(totalOpeningBal);
-      setTotalExpenses(totalExpensesSum);
-      setClosingBalance(totalOpeningBal - totalExpensesSum);
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        let sheetName;
-        if (activeTab === "patty") {
-          sheetName = "Patty Expence";
-          await Promise.all([
-            fetchTransactions(sheetName),
-            fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role, selectedMonth)
-          ]);
-        } else {
-          if (selectedTallySheet === "All") {
-            const sheetsToFetch = tallySheets.filter(s => s !== "All");
-            await Promise.all([
-              fetchTransactions(sheetsToFetch),
-              fetchMultipleTallyStats(sheetsToFetch, currentUser.name, currentUser.role, selectedMonth)
-            ]);
-          } else {
-            sheetName = selectedTallySheet;
-            await Promise.all([
-              fetchTransactions(sheetName),
-              fetchStatsAndExpenses(sheetName, currentUser.name, currentUser.role, selectedMonth)
-            ]);
-          }
-        }
-      } finally {
-        setIsLoading(false);
-      }
+    const monthMap: {[key: string]: string} = {
+      'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+      'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
     };
-
-    loadData();
-  }, [activeTab, selectedTallySheet, currentUser, selectedMonth]);
-  const fetchTransactions = async (sheetNames: string | string[]) => {
-    setIsLoading(true);
-
-    try {
-      const sheets = Array.isArray(sheetNames) ? sheetNames : [sheetNames];
-      const allData: Transaction[] = [];
-
-      for (const sheetName of sheets) {
-        const response = await fetch(
-          `${scriptUrl}?sheet=${encodeURIComponent(sheetName)}&action=fetch`
-        );
-        const result = await response.json();
-
-        if (result.success && result.data) {
-          let data = result.data;
-
-          // ONLY filter if NOT admin
-          if (currentUser && currentUser.role.toLowerCase() !== 'admin') {
-            const userName = currentUser.name.trim().toLowerCase();
-
-            if (sheetName === 'Patty Expence') {
-              data = data.filter(row =>
-                row[27] && row[27].toString().trim().toLowerCase() === userName
-              );
-            } else {
-              data = data.filter(row =>
-                row[3] && row[3].toString().trim().toLowerCase() === userName
-              );
-            }
-          }
-          // Admin ke liye NO filter - sab data show hoga
-
-          const formatted: Transaction[] = data.map((row: any[], index: number) => ({
-            id: row[1] ? row[1].toString() : (allData.length + index + 1).toString(),
-            rowIndex: index + 2,
-            date: row[2] || "",
-            name: sheetName === 'Patty Expence' ? (row[27] || "") : (row[3] || ""), // Correct name field
-            openingQty: row[3] || "",
-            closing: row[4] || "",
-            teaNasta: row[5] || "",
-            waterJar: row[6] || "",
-            lightBill: row[7] || "",
-            recharge: row[8] || "",
-            postOffice: row[9] || "",
-            customerDiscount: row[10] || "",
-            repairMaintenance: row[11] || "",
-            stationary: row[12] || "",
-            petrol: row[13] || "",
-            patilPetrol: row[14] || "",
-            incentive: row[15] || "",
-            advance: row[16] || "",
-            breakage: row[18] || "",
-            excisePolice: row[20] || "",
-            desiBhada: row[20] || "",
-            roomExpense: row[21] || "",
-            officeExpense: row[22] || "",
-            personalExpense: row[23] || "",
-            miscExpense: row[24] || "",
-            creditCardCharges: row[25] || "",
-            transactionStatus: row[28] || "Pending",
-            category: getCategoryFromRow(row),
-            description: generateDescription(row),
-            amount: row.slice(5, 26).reduce((a, v) => a + (parseFloat(v) || 0), 0),
-            status: row[26] || "Pending",
-            remarks: "",
-            otherPurchaseVoucherNo: "",
-            otherVendorPayment: "",
-            differenceAmount: "",
-            sheetName: sheetName,
-          }));
-
-          allData.push(...formatted);
-        }
-      }
-
-      setTransactions(allData);
-    } catch (error) {
-      console.error("Error:", error);
-      setTransactions([]);
+    const monthParts = dateStr.match(/^(\d{1,2})[\s\-]+([A-Za-z]+)[\s\-,\.]+?(\d{4})/);
+    if (monthParts) {
+        const day = monthParts[1].padStart(2, '0');
+        const monthName = monthParts[2].substring(0, 3).toLowerCase();
+        const month = monthMap[monthName] || '01';
+        const year = monthParts[3];
+        return `${year}-${month}-${day}`;
     }
+    let date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    return dateStr;
   };
 
+  const isRowInRange = (dateStr: string) => {
+    if (!summaryStartDate && !summaryEndDate) return true;
+    const isoDate = normalizeToISO(dateStr);
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}/.test(isoDate)) return true;
+    const start = summaryStartDate || "0000-00-00";
+    const end = summaryEndDate || "9999-99-99";
+    return isoDate >= start && isoDate <= end;
+  };
+
+  const filterDataByUser = (data: any[], sheetName: string, user: { name: string, role: string } | null) => {
+    if (!user || user.role.toLowerCase() === 'admin') return data;
+    const userName = user.name.trim().toLowerCase();
+    if (sheetName === 'Patty Expence') {
+      return data.filter((row: any[]) =>
+        row[27] && row[27].toString().trim().toLowerCase() === userName
+      );
+    } else {
+      return data.filter((row: any[]) =>
+        row[3] && row[3].toString().trim().toLowerCase() === userName
+      );
+    }
+  };
 
   const getCategoryFromRow = (row: any[]) => {
     if (parseFloat(row[5]) > 0) return "Tea & Snacks";
@@ -688,24 +598,596 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    let sheetName;
-    if (activeTab === "patty") {
-      sheetName = "Patty Expence";
-      fetchTransactions(sheetName);
-      fetchStatsAndExpenses(sheetName, currentUser?.name || null, currentUser?.role || null, selectedMonth);
-    } else {
-      if (selectedTallySheet === "All") {
-        const sheetsToFetch = tallySheets.filter(s => s !== "All");
-        fetchTransactions(sheetsToFetch);
-        fetchMultipleTallyStats(sheetsToFetch, currentUser?.name || null, currentUser?.role || null, selectedMonth);
-      } else {
-        sheetName = selectedTallySheet;
-        fetchTransactions(sheetName);
-        fetchStatsAndExpenses(sheetName, currentUser?.name || null, currentUser?.role || null, selectedMonth);
+    const processSummaryData = (data: any[]) => {
+      if (!data || !Array.isArray(data)) return;
+      
+      const dataRows = data.filter(
+        (r) => Array.isArray(r) && r.length >= 30
+      );
+      
+      // 1. Process Petty Cash
+      // UI: Column O to U (indices 14-20)
+      setPettySummaryData(dataRows.filter((r: any[]) => r[14] && r[14].toString().trim().toUpperCase() !== "DATE").map((r: any[], i: number) => ({
+        id: i, date: formatDate(r[14]), voucherNo: "-", 
+        balance: parseNumber(r[15]), dailyExpenses: parseNumber(r[16]), 
+        maintenance: parseNumber(r[17]), fuel: parseNumber(r[18]),
+        otherExpenses: parseNumber(r[19]), payments: parseNumber(r[20])
+      })));
+
+      // PDF: Now using the same source as frontend UI (Column O to U)
+      setPettyPdfData(
+        dataRows
+          .filter((r) => r[14] && r[14].toString().trim().toUpperCase() !== "DATE")
+          .map((r, i) => ({
+            id: i,
+            date: formatDate(r[14]),          
+            voucherNo: "-",           
+            balance: parseNumber(r[15]),       
+            dailyExpenses: parseNumber(r[16]), 
+            maintenance: parseNumber(r[17]),   
+            fuel: parseNumber(r[18]),          
+            otherExpenses: parseNumber(r[19]), 
+            payments: parseNumber(r[20]),      
+          }))
+      );
+
+      // 2. Process Tally Cash
+      const tIdx = data.findIndex((r: any[]) => r && r.some((c: any) => c?.toString().trim() === "Counter Wise"));
+      const tRows = data.slice(tIdx !== -1 ? tIdx + 1 : 4); 
+
+      // UI: Column A to K (indices 0-10)
+      setTallySummaryData(tRows.filter((r: any[]) => r[1] && r[1].toString().trim().toUpperCase() !== "DATE").map((r: any[], i: number) => ({
+        id: i, counterName: r[0] || "-", date: formatDate(r[1]),
+        retailAmt: parseNumber(r[2]), wsaleAmt: parseNumber(r[3]), homeDelivery: parseNumber(r[4]),
+        expenses: parseNumber(r[5]), card: parseNumber(r[6]), paytm: parseNumber(r[7]),
+        gpay: parseNumber(r[8]), phonePe: parseNumber(r[9]), cash: parseNumber(r[10]),
+        diff: parseNumber(r[11]) || 0
+      })));
+
+      // PDF: Now using the same source as frontend UI (Column A to L)
+      setTallyPdfData(tRows.filter((r: any[]) => r[1] || r[0])
+        .filter((r) => r[1] && r[1].toString().trim().toUpperCase() !== "DATE")
+        .map((r: any[], i: number) => ({
+          id: i, 
+          counterName: r[0] || "-", 
+          date: formatDate(r[1]),
+          retailAmt: parseNumber(r[2]), 
+          wsaleAmt: parseNumber(r[3]),
+          homeDelivery: parseNumber(r[4]),
+          expenses: parseNumber(r[5]),
+          card: parseNumber(r[6]), 
+          paytm: parseNumber(r[7]),
+          gpay: parseNumber(r[8]), 
+          phonePe: parseNumber(r[9]), 
+          cash: parseNumber(r[10]), 
+          diff: parseNumber(r[11])
+        })));
+    };
+
+    const fetchAllSummaries = async () => {
+      setIsSummaryLoading(true);
+      try {
+        const response = await fetch(
+          `${scriptUrl}?sheet=All%20Counter%20Summary&action=fetch`
+        );
+        const result = await response.json();
+        const data = result.data || (Array.isArray(result) ? result : null);
+        if (data && Array.isArray(data)) {
+          setSummaryCache(data);
+          processSummaryData(data);
+        }
+      } catch (err) {
+        console.error("Summary processing error:", err);
+      } finally {
+        setIsSummaryLoading(false);
       }
+    };
+
+    if (summaryCache) {
+      processSummaryData(summaryCache);
+    } else {
+      fetchAllSummaries();
     }
+  }, [summaryCache, scriptUrl]);
+
+  const formatDate = (dateString: any) => {
+    if (!dateString) return "";
+    let date = new Date(dateString);
+    
+    // Manual parsing for DD/MM/YYYY or DD-MM-YYYY
+    if (isNaN(date.getTime())) {
+        const parts = dateString.toString().match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+        if (parts) {
+            date = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+        }
+    }
+
+    if (isNaN(date.getTime())) return dateString.toString();
+
+    // Stable manual format: DD MMM YYYY
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const d = date.getDate().toString().padStart(2, '0');
+    const m = months[date.getMonth()];
+    const y = date.getFullYear();
+    return `${d} ${m} ${y}`;
+  };
+
+  const handleExportPDF = () => {
+    const isPetty = activeTab === "patty";
+    const sourceData = isPetty ? pettyPdfData : tallyPdfData;
+    
+    const dataToExport = isPetty 
+      ? (sourceData as SummaryRow[]).filter(row => isRowInRange(row.date))
+      : (sourceData as TallySummaryRow[]).filter(row => {
+          const matchesCounter = selectedTallySheet === "All" || row.counterName === selectedTallySheet;
+          return matchesCounter && isRowInRange(row.date);
+        });
+
+    const formattedPeriodStart = summaryStartDate 
+      ? new Date(summaryStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      : "01 November 2025";
+    const formattedPeriodEnd = summaryEndDate 
+      ? new Date(summaryEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const generatedOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const title = isPetty ? "PETTY CASH REPORT" : "TALLY CASH REPORT";
+    const headers = isPetty 
+      ? ["DATE", "Purchase Voucher No.", "Opening & Closing Balance", "Daily Expenses", "Maintenance & Repairs", "Fuel & Transport", "Other Expenses", "Payments & Vendors"]
+      : ["Counter", "Date", "Retail Amt", "Wholesale Amt", "Home Delivery", "Expenses", "Card", "UPI/Paytm", "G-Pay", "PhonePe", "Cash", "Diff"];
+
+    const printContent = `
+      <style>
+        @media print {
+          table { border-collapse: separate; border-spacing: 0; width: 100%; border: none; }
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
+          tr { page-break-inside: avoid; break-inside: avoid; }
+          .no-border td, .no-border th { border: none !important; }
+        }
+        table { border-collapse: separate; border-spacing: 0; width: 100%; border: none; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        tr { page-break-inside: avoid; break-inside: avoid; }
+        .no-border td { border: none !important; }
+        .pdf-cell { border-top: 1px solid #e0e0e0; border-left: 1px solid #e0e0e0; }
+        .pdf-header-cell { border-top: 1px solid #90caf9; border-left: 1px solid #90caf9; background-color: #b3e5fc; color: #01579b; }
+        .last-col { border-right: 1px solid #e0e0e0 !important; }
+        .last-row td { border-bottom: 1px solid #e0e0e0 !important; }
+      </style>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #333; width: 100%; border: none;">
+        <table style="width: 100%; border-collapse: separate; border-spacing: 0; border: none;">
+          <!-- Repeating Page Header -->
+          <thead style="display: table-header-group;">
+            <!-- Branding Row -->
+            <tr class="no-border">
+              <td colspan="${headers.length}" style="padding: 40px 40px 10px 40px; border: none;">
+                <div style="text-align: center; margin-bottom: 25px;">
+                  <h1 style="color: #800000; margin: 0; font-size: 32px; font-weight: bold;">PUNE WINES</h1>
+                  <p style="margin: 5px 0; color: #666; font-size: 14px;">3915 Monkhorst Road, Mld NR 38852</p>
+                  <p style="margin: 5px 0; color: #666; font-size: 14px;">(123) 123-4567 | www.punewines.com</p>
+                  <hr style="border: 0; height: 1px; background: #000; margin: 15px 0;" />
+                </div>
+                
+                <h2 style="text-align: center; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; font-size: 18px;">${title}</h2>
+
+                <div style="background-color: #f0f7ff; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 20px; border: 1px solid #d0e5ff;">
+                  <p style="margin: 0; font-size: 15px; color: #2a5298;">
+                    Report Period: <strong>${formattedPeriodStart}</strong> to <strong>${formattedPeriodEnd}</strong>
+                  </p>
+                </div>
+
+                <div style="background-color: #fcfcfc; padding: 15px; border-radius: 6px; margin-bottom: 30px; border-left: 5px solid #007bff;">
+                   <p style="margin: 0 0 10px 0; font-size: 14px;"><strong>Generated On :</strong> ${generatedOn}</p>
+                   <p style="margin: 0; font-size: 14px;"><strong>Managed By :</strong> ____________________</p>
+                </div>
+              </td>
+            </tr>
+            <!-- Table Sub-Header Row -->
+            <tr class="no-border">
+              <td colspan="${headers.length}" style="padding: 0 40px 15px 40px; border: none; text-align: center;">
+                <h3 style="font-size: 20px; margin: 0; font-weight: bold; color: #333; text-transform: uppercase;">EXPENSE RECORDS</h3>
+              </td>
+            </tr>
+            <!-- Data Column Headers Row -->
+            <tr>
+              ${headers.map((h, i) => `
+                <th class="pdf-header-cell ${i === headers.length - 1 ? 'last-col' : ''}" style="padding: 10px 5px; text-align: center; font-size: 10px; font-weight: bold;">
+                  ${h}
+                </th>`).join('')}
+            </tr>
+          </thead>
+
+          <!-- Table Body Content -->
+          <tbody style="display: table-row-group;">
+            ${dataToExport.map((row, idx) => {
+              const isLastRow = idx === dataToExport.length - 1;
+              if (isPetty) {
+                const r = row as SummaryRow;
+                return `
+                  <tr style="page-break-inside: avoid; break-inside: avoid;" class="${isLastRow ? 'last-row' : ''}">
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.date}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">PVN - ${String(idx + 1).padStart(2, '0')}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; font-weight: bold;">${formatCurrency(parseNumber(r.balance))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #d32f2f;">${formatCurrency(parseNumber(r.dailyExpenses))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #d32f2f;">${formatCurrency(parseNumber(r.maintenance))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #d32f2f;">${formatCurrency(parseNumber(r.fuel))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #d32f2f;">${formatCurrency(parseNumber(r.otherExpenses))}</td>
+                    <td class="pdf-cell last-col" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #e65100; font-weight: bold;">${formatCurrency(parseNumber(r.payments))}</td>
+                  </tr>
+                `;
+              } else {
+                const r = row as any;
+                return `
+                  <tr style="page-break-inside: avoid; break-inside: avoid;" class="${isLastRow ? 'last-row' : ''}">
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.counterName}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.date}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #2e7d32;">${formatCurrency(parseNumber(r.retailAmt))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #2e7d32;">${formatCurrency(parseNumber(r.wsaleAmt))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #1565c0;">${formatCurrency(parseNumber(r.homeDelivery))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #c62828;">${formatCurrency(parseNumber(r.expenses))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${formatCurrency(parseNumber(r.card))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${formatCurrency(parseNumber(r.paytm))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${formatCurrency(parseNumber(r.gpay))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${formatCurrency(parseNumber(r.phonePe))}</td>
+                    <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px; font-weight: bold;">${formatCurrency(parseNumber(r.cash))}</td>
+                    <td class="pdf-cell last-col" style="padding: 8px 4px; text-align: center; font-size: 10px; font-weight: bold; color: ${parseNumber(r.diff) !== 0 ? '#d32f2f' : '#2e7d32'}">${formatCurrency(parseNumber(r.diff))}</td>
+                  </tr>
+                `;
+              }
+            }).join('')}
+            
+            <!-- Grand Total Row -->
+            <tr style="background-color: #f8f9fa; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
+              <td colspan="${isPetty ? 7 : 11}" class="pdf-cell" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 11px;">
+                GRAND TOTAL ${isPetty ? '' : '(CASH)'}
+              </td>
+              <td class="pdf-cell last-col" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 12px;">
+                ${formatCurrency(dataToExport.reduce((sum, row) => sum + parseNumber(isPetty ? (row as SummaryRow).payments : (row as any).cash), 0))}
+              </td>
+            </tr>
+          </tbody>
+
+          <!-- Repeating Footer -->
+          <tfoot style="display: table-footer-group;">
+            <tr class="no-border">
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    const element = document.createElement('div');
+    element.innerHTML = printContent;
+    
+    const options = {
+      margin: 10,
+      filename: `${isPetty ? 'Petty_Cash' : 'Tally_Cash'}_Report_${new Date().getTime()}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+      pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    // Direct download
+    html2pdf().from(element).set(options).save();
+  };
+
+  const handleExportExcel = () => {
+    const isPetty = activeTab === "patty";
+    let worksheetData: any[][] = [];
+    let sheetName = isPetty ? "Petty Cash" : "Tally Cash";
+
+    if (isPetty) { 
+      // Use raw from 'Patty Expence' sheet
+      const rawRows = sheetCache["Patty Expence"];
+      if (!rawRows || rawRows.length === 0) {
+        alert("Petty Expense data is not loaded yet. Please wait.");
+        return;
+      }
+
+      // Row 3 (index 2) is the header according to image
+      // But we should find the row with "Timestamp" or "Date" to be safe
+      let headerIdx = rawRows.findIndex(r => r && r.some((c: any) => c?.toString().trim() === "Date"));
+      if (headerIdx === -1) headerIdx = 2; // Fallback to index 2
+
+      const headers = rawRows[headerIdx];
+      const dateColIdx = headers.findIndex((c: any) => c?.toString().trim() === "Date") ?? 2;
+
+      const filteredData = rawRows.slice(headerIdx + 1).filter(r => {
+        if (!r[dateColIdx]) return false;
+        return isRowInRange(r[dateColIdx].toString());
+      });
+
+      worksheetData = [headers, ...filteredData];
+    } else {
+      // Tally Cash (using raw sheets)
+      const sheetsToProcess = selectedTallySheet === "All" 
+        ? ["Cash Tally Counter 1", "Cash Tally Counter 2", "Cash Tally Counter 3"]
+        : [selectedTallySheet];
+
+      let combinedData: any[][] = [];
+      let commonHeaders: any[] = [];
+
+      sheetsToProcess.forEach(sName => {
+        const rawRows = sheetCache[sName];
+        if (!rawRows || rawRows.length === 0) return;
+
+        // Find header row (Timestamp/Date)
+        let headerIdx = rawRows.findIndex(r => r && r.some((c: any) => c?.toString().trim() === "Date"));
+        if (headerIdx === -1) headerIdx = 2; // Fallback
+
+        if (commonHeaders.length === 0) {
+          commonHeaders = rawRows[headerIdx];
+        }
+
+        const dateColIdx = rawRows[headerIdx].findIndex((c: any) => c?.toString().trim() === "Date") ?? 2;
+
+        const filtered = rawRows.slice(headerIdx + 1).filter(r => {
+          if (!r[dateColIdx]) return false;
+          return isRowInRange(r[dateColIdx].toString());
+        });
+
+        combinedData.push(...filtered);
+      });
+
+      if (commonHeaders.length === 0) {
+        alert("No Tally data found for selected period.");
+        return;
+      }
+
+      worksheetData = [commonHeaders, ...combinedData];
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // Basic styling for the worksheet (setting default column width)
+    const wscols = worksheetData[0].map(() => ({ wch: 15 }));
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${sheetName.replace(" ", "_")}_Summary_${summaryStartDate || 'Start'}_to_${summaryEndDate || 'End'}.xlsx`);
+  };
+
+
+  // --- Data Processing Helpers ---
+
+
+  // Helper to convert sheet rows into Transaction objects
+  const mapRowsToTransactions = (rows: any[], sheetName: string, currentTotalCount: number): Transaction[] => {
+     return rows.map((row: any[], index: number) => ({
+      id: row[1] ? row[1].toString() : (currentTotalCount + index + 1).toString(),
+      rowIndex: index + 2,
+      date: normalizeToISO(row[2] || ""),
+      name: sheetName === 'Patty Expence' ? (row[27] || "") : (row[3] || ""),
+      openingQty: row[3] || "",
+      closing: row[4] || "",
+      teaNasta: row[5] || "",
+      waterJar: row[6] || "",
+      lightBill: row[7] || "",
+      recharge: row[8] || "",
+      postOffice: row[9] || "",
+      customerDiscount: row[10] || "",
+      repairMaintenance: row[11] || "",
+      stationary: row[12] || "",
+      petrol: row[13] || "",
+      patilPetrol: row[14] || "",
+      incentive: row[15] || "",
+      advance: row[16] || "",
+      breakage: row[18] || "",
+      excisePolice: row[20] || "",
+      desiBhada: row[20] || "",
+      roomExpense: row[21] || "",
+      officeExpense: row[22] || "",
+      personalExpense: row[23] || "",
+      miscExpense: row[24] || "",
+      creditCardCharges: row[25] || "",
+      transactionStatus: row[28] || "Pending",
+      category: getCategoryFromRow(row),
+      description: generateDescription(row),
+      amount: row.slice(5, 26).reduce((a: number, v: any) => a + (parseFloat(v) || 0), 0),
+      status: row[26] || "Pending",
+      remarks: "",
+      otherPurchaseVoucherNo: "",
+      otherVendorPayment: "",
+      differenceAmount: "",
+      sheetName: sheetName,
+    }));
+  };
+
+
+
+  // --- Effect 1: Fetch Data on Tab/User Change (ONLY) ---
+  useEffect(() => {
+    if (!currentUser) {
+        setIsLoading(false);
+        return;
+    }
+
+    const fetchData = async () => {
+      
+      // 1. Determine which sheets are needed
+      let sheetsToFetch: string[] = [];
+      if (activeTab === "patty") {
+        sheetsToFetch = ["Patty Expence"];
+      } else if (selectedTallySheet === "All") {
+        sheetsToFetch = tallySheets.filter(s => s !== "All");
+      } else {
+        sheetsToFetch = [selectedTallySheet];
+      }
+
+      // 2. check cache
+      const missingSheets = sheetsToFetch.filter(sheet => !sheetCache[sheet]);
+
+      // If we have everything, just update rawData and return (Instant!)
+      if (missingSheets.length === 0) {
+        const cachedResults = sheetsToFetch.map(sheet => ({
+            sheet,
+            data: filterDataByUser(sheetCache[sheet], sheet, currentUser)
+        }));
+        setRawData(cachedResults);
+        setIsLoading(false); 
+        return;
+      }
+
+      setIsLoading(true);
+      
+      // Safety timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 15000)
+      );
+
+      const fetchDataTask = async () => {
+        try {
+          // 3. Fetch ONLY missing sheets in parallel
+          const newSheetResults = await Promise.all(
+            missingSheets.map(async (sheet) => {
+              try {
+                const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(sheet)}&action=fetch`);
+                const json = await res.json();
+                
+                // Store RAW data in cache (unfiltered)
+                const allData = (json.success && json.data) ? json.data : [];
+                return { sheet, data: allData };
+              } catch (e) {
+                console.error(`Failed to load ${sheet}`, e);
+                return { sheet, data: [] };
+              }
+            })
+          );
+
+          // 4. Update Cache
+          setSheetCache(prev => {
+              const newCache = { ...prev };
+              newSheetResults.forEach(item => {
+                  newCache[item.sheet] = item.data;
+              });
+              return newCache;
+          });
+
+          // 5. Combine cached data + new data for current view
+          const finalResults = sheetsToFetch.map(sheet => {
+              // Try finding in new results
+              const newRes = newSheetResults.find(r => r.sheet === sheet);
+              const data = newRes ? newRes.data : (sheetCache[sheet] || []);
+              
+              return {
+                  sheet,
+                  data: filterDataByUser(data, sheet, currentUser)
+              };
+          });
+
+          setRawData(finalResults);
+
+        } catch (error) {
+          console.error("Error in fetching sequence:", error);
+        }
+      };
+
+      try {
+        await Promise.race([fetchDataTask(), timeoutPromise]);
+      } catch (err) {
+        console.error("Data loading timed out or failed:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    // Intentionally excluding selectedMonth so we don't re-fetch on month change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedTallySheet, selectedMonth]);
+  }, [activeTab, selectedTallySheet, currentUser]);
+
+  // --- Effect 2: Process Data on RawData or Month Change ---
+  useEffect(() => {
+     // If no data, do nothing yet. Wait for fetch.
+     if (!rawData || rawData.length === 0) return;
+
+      let accumulatedTransactions: Transaction[] = [];
+      let totalOpening = 0;
+      let totalClosing = 0;
+      let hasPettyData = false;
+
+      for (const { sheet, data } of rawData) {
+        
+        // Stats Calculation: ONLY for Patty Cash tab
+        // Removing strict 'Patty Expence' check to rely on activeTab
+        if (activeTab === "patty") {
+             // 1. Calculate Stats
+             let foundTotalRow = false;
+             let openingSum = 0;
+             let closingSum = 0;
+             let manualOpeningSum = 0;
+             let manualClosingSum = 0;
+             
+             // Debug data presence
+             console.log(`Processing sheet: ${sheet}, Rows: ${data.length}`);
+
+             for (let i = 0; i < data.length; i++) {
+                 const row = data[i];
+                 if (!row || row.length < 5) continue;
+
+                 // Robust check for "Total" in first 3 columns
+                 const col0 = row[0] ? row[0].toString().trim().toLowerCase() : "";
+                 const col1 = row[1] ? row[1].toString().trim().toLowerCase() : "";
+                 const col2 = row[2] ? row[2].toString().trim().toLowerCase() : "";
+
+                 if (col0 === 'total' || col1 === 'total' || col2 === 'total') {
+                     openingSum = parseNumber(row[3]);
+                     closingSum = parseNumber(row[4]);
+                     foundTotalRow = true;
+                     // console.log("Found Total Row at index", i);
+                 } else {
+                     // Accumulate manual sum (skipping headers/Total if logically found, 
+                     // but here we are in loop, so we sum everything else just in case Total is missing)
+                     // If we eventually find Total, we override this manual sum.
+                     
+                     // Simple heuristic to avoid headers: check if Col D is a valid number
+                     const opVal = parseNumber(row[3]);
+                     const clVal = parseNumber(row[4]);
+                     manualOpeningSum += opVal;
+                     manualClosingSum += clVal;
+                 }
+             }
+
+             if (foundTotalRow) {
+                 totalOpening = openingSum;
+                 totalClosing = closingSum;
+                 console.log("Using Total Row values");
+             } else {
+                 // For filtered views (non-admin) or if Total row missing
+                 totalOpening = manualOpeningSum;
+                 totalClosing = manualClosingSum;
+                 console.log("Using Manual Sum values:", manualOpeningSum, manualClosingSum);
+             }
+             
+             hasPettyData = true;
+        }
+
+        // Transactions: Filter by month for the table
+        const dataForTable = data.filter(row => {
+            const rowDate = normalizeToISO(row[2] ? row[2].toString() : "");
+            return rowDate.startsWith(selectedMonth);
+        });
+        const newTransactions = mapRowsToTransactions(dataForTable, sheet, accumulatedTransactions.length);
+        accumulatedTransactions.push(...newTransactions);
+      }
+
+      setTransactions(accumulatedTransactions);
+      
+      // Update stats based on what we processed
+      if (activeTab === "patty" && hasPettyData) {
+          setOpeningBalance(totalOpening);
+          setTotalExpenses(totalOpening + totalClosing);
+          setClosingBalance(totalClosing);
+      } else if (activeTab === "tally") {
+          setOpeningBalance(0);
+          setTotalExpenses(0);
+          setClosingBalance(0);
+      }
+
+  }, [rawData, selectedMonth, activeTab]);
 
   const filteredTransactions = transactions.filter(t => {
     const matchesSheet = activeTab === "tally" && selectedTallySheet !== "All"
@@ -772,44 +1254,16 @@ export default function Dashboard() {
     },
   ];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <svg
-            className="animate-spin h-10 w-10 text-[#2a5298] mx-auto mb-4"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <p className="text-gray-600">Loading transactions...</p>
-        </div>
-      </div>
-    );
-  }
+
+
+
+  const TALLY_SHEET_OPTIONS = [
+    { label: "All Tally Counters", sheet: "All" },
+    { label: "Cash Tally Counter 1", sheet: "Cash Tally Counter 1" },
+    { label: "Cash Tally Counter 2", sheet: "Cash Tally Counter 2" },
+    { label: "Cash Tally Counter 3", sheet: "Cash Tally Counter 3" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -828,6 +1282,7 @@ export default function Dashboard() {
                   <div className={`${stat.bgLight} p-2 rounded-lg`}>
                     <Icon className={`${stat.textColor} text-xl`} />
                   </div>
+                  {/* Month Picker - Always visible */}
                   <input
                     type="month"
                     value={selectedMonth}
@@ -898,7 +1353,7 @@ export default function Dashboard() {
                   // Regular User - Read-only, no edit
                   <div className="flex items-center justify-between">
                     <p className="text-lg md:text-xl font-bold text-gray-800">
-                      {formatCurrency(stat.value)}
+                      <CountUpAnimation end={stat.value} isLoading={false} />
                     </p>
                   </div>
                 )}
@@ -921,12 +1376,269 @@ export default function Dashboard() {
                 {stat.title}
               </p>
               <p className="text-lg md:text-xl font-bold text-gray-800">
-                {formatCurrency(stat.value)}
+                <CountUpAnimation end={stat.value} isLoading={isLoading} />
               </p>
             </div>
           );
         })}
       </div>
+
+     {/* TABS & DROPDOWN (Moved from TransactionTable) */}
+      <div className="flex items-center justify-between">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
+          <button
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === "patty"
+                ? "bg-blue-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+            onClick={() => setActiveTab("patty")}
+          >
+            Patty Cash
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium border-l border-gray-200 ${
+              activeTab === "tally"
+                ? "bg-blue-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+            onClick={() => setActiveTab("tally")}
+          >
+            Tally Cash
+          </button>
+        </div>
+        
+
+      </div>
+
+      {/* SUMMARY TABLE (Visible only activeTab is Patty) */}
+      {activeTab === "patty" && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-800">Day-wise Summary</h3>
+            <div className="flex items-center gap-3">
+               {/* Export Buttons */}
+               <div className="flex items-center gap-2 mr-2">
+                 <button 
+                   onClick={handleExportPDF}
+                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
+                 >
+                   <FaFilePdf className="text-sm" /> Export PDF
+                 </button>
+                 <button 
+                   onClick={handleExportExcel}
+                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
+                 >
+                   <FaFileExcel className="text-sm" /> Export Excel
+                 </button>
+               </div>
+
+               <div className="flex items-center gap-2">
+                 <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
+                 <input 
+                   type="date" 
+                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                   value={summaryStartDate}
+                   onChange={(e) => setSummaryStartDate(e.target.value)}
+                 />
+               </div>
+               <div className="flex items-center gap-2">
+                 <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
+                 <input 
+                   type="date" 
+                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                   value={summaryEndDate}
+                   onChange={(e) => setSummaryEndDate(e.target.value)}
+                 />
+               </div>
+               {(summaryStartDate || summaryEndDate) && (
+                   <button 
+                     onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
+                     className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                   >
+                     Clear
+                   </button>
+               )}
+            </div>
+        </div>
+        <div className="overflow-auto max-h-[500px] hide-scrollbar">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[150px]">Opening & Closing<br/>Balance</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Daily<br/>Expenses</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Maintenance<br/>& Repairs</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Fuel &<br/>Transport</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Other<br/>Expenses</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Payments &<br/>Vendors</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isSummaryLoading ? (
+                 <tr>
+                    <td colSpan={11} className="px-6 py-12 text-center">
+                        <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-sm text-gray-500">Loading summary...</p>
+                    </td>
+                 </tr>
+              ) : pettySummaryData.filter(row => isRowInRange(row.date)).length === 0 ? (
+                <tr>
+                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">
+                     No Data Found
+                   </td>
+                </tr>
+              ) : (
+                pettySummaryData
+                  .filter(row => isRowInRange(row.date))
+                  .map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
+                    <td className="px-6 py-4 text-center text-gray-700 font-medium">{formatCurrency(parseFloat(row.balance.toString()))}</td>
+                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.dailyExpenses.toString()))}</td>
+                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.maintenance.toString()))}</td>
+                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.fuel.toString()))}</td>
+                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.otherExpenses.toString()))}</td>
+                    <td className="px-6 py-4 text-center text-orange-600">{formatCurrency(parseFloat(row.payments.toString()))}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
+      {/* TALLY SUMMARY TABLE (Visible only activeTab is Tally) */}
+      {activeTab === "tally" && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-800">Tally Summary</h3>
+            <div className="flex items-center gap-3">
+               {/* Export Buttons */}
+               <div className="flex items-center gap-2 mr-2">
+                 <button 
+                   onClick={handleExportPDF}
+                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
+                 >
+                   <FaFilePdf className="text-sm" /> Export PDF
+                 </button>
+                 <button 
+                   onClick={handleExportExcel}
+                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
+                 >
+                   <FaFileExcel className="text-sm" /> Export Excel
+                 </button>
+               </div>
+
+               <div className="flex items-center gap-2">
+                 <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
+                 <input 
+                   type="date" 
+                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                   value={summaryStartDate}
+                   onChange={(e) => setSummaryStartDate(e.target.value)}
+                 />
+               </div>
+               <div className="flex items-center gap-2">
+                 <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
+                 <input 
+                   type="date" 
+                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                   value={summaryEndDate}
+                   onChange={(e) => setSummaryEndDate(e.target.value)}
+                 />
+               </div>
+                {(summaryStartDate || summaryEndDate) && (
+                   <button 
+                     onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
+                     className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                   >
+                     Clear
+                   </button>
+               )}
+               {/* Moved Dropdown here */}
+               <select
+                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                value={selectedTallySheet}
+                onChange={(e) => setSelectedTallySheet(e.target.value)}
+               >
+                {TALLY_SHEET_OPTIONS.map((option) => (
+                  <option key={option.sheet} value={option.sheet}>
+                    {option.label}
+                  </option>
+                ))}
+               </select>
+            </div>
+        </div>
+        <div className="overflow-auto max-h-[500px] hide-scrollbar">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Retail<br/>Amt</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Wholesale<br/>Amt</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Home<br/>Delivery</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Expenses</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Card</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">UPI/Paytm</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">G-Pay</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">PhonePe</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Cash</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Diff</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+             {isSummaryLoading ? (
+                 <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center">
+                        <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-sm text-gray-500">Loading tally summary...</p>
+                    </td>
+                 </tr>
+              ) : tallySummaryData
+                .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
+                .filter(row => isRowInRange(row.date))
+                .length === 0 ? (
+                <tr>
+                   <td colSpan={11} className="px-6 py-8 text-center text-gray-500 font-medium">
+                     No Data Found
+                   </td>
+                </tr>
+              ) : (
+                tallySummaryData
+                  .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
+                  .filter(row => isRowInRange(row.date))
+                  .map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
+                    <td className="px-6 py-4 text-center text-green-600 font-medium">{formatCurrency(parseFloat((row.retailAmt || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-green-600">{formatCurrency(parseFloat((row.wsaleAmt || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-blue-600">{formatCurrency(parseFloat((row.homeDelivery || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat((row.expenses || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.card || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.paytm || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.gpay || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.phonePe || 0).toString()))}</td>
+                    <td className="px-6 py-4 text-center text-gray-900 font-bold">{formatCurrency(parseFloat((row.cash || 0).toString()))}</td>
+                    <td className={`px-6 py-4 text-center font-bold ${parseFloat((row.diff || 0).toString()) !== 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        {formatCurrency(parseFloat((row.diff || 0).toString()))}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
       {/* TABLE */}
       <TransactionTable
         transactions={filteredTransactions}
