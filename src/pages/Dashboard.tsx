@@ -375,7 +375,7 @@ import {
 import TransactionTable from "../components/TransactionTable";
 import { Transaction } from "../types";
 import { useAuth } from "../contexts/AuthContext";
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
@@ -464,7 +464,7 @@ export default function Dashboard() {
   // Stats from sheet row 1 (top red text row)
   const [openingBalance, setOpeningBalance] = useState(0);
   const [closingBalance, setClosingBalance] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [_totalExpenses, _setTotalExpenses] = useState(0);
   const [pettyPdfData, setPettyPdfData] = useState<SummaryRow[]>([]);
   const [tallyPdfData, setTallyPdfData] = useState<TallySummaryRow[]>([]);
 
@@ -838,14 +838,43 @@ export default function Dashboard() {
             }).join('')}
             
             <!-- Grand Total Row -->
-            <tr style="background-color: #f8f9fa; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
-              <td colspan="${isPetty ? 7 : 11}" class="pdf-cell" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 11px;">
-                GRAND TOTAL ${isPetty ? '' : '(CASH)'}
-              </td>
-              <td class="pdf-cell last-col" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 12px;">
-                ${formatCurrency(dataToExport.reduce((sum, row) => sum + parseNumber(isPetty ? (row as SummaryRow).payments : (row as any).cash), 0))}
-              </td>
-            </tr>
+            ${(() => {
+              if (isPetty) {
+                const pettyRows = dataToExport as SummaryRow[];
+                // Calculate column-wise sums
+                const balanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.balance), 0);
+                const dailyExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.dailyExpenses), 0);
+                const maintenanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.maintenance), 0);
+                const fuelSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.fuel), 0);
+                const otherExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.otherExpenses), 0);
+                const paymentsSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.payments), 0);
+                // Grand Total = sum of all column sums
+                const grandTotal = balanceSum + dailyExpensesSum + maintenanceSum + fuelSum + otherExpensesSum + paymentsSum;
+                return `
+                  <tr style="background-color: #b71c1c; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
+                    <td colspan="7" class="pdf-cell" style="padding: 12px; text-align: center; color: #ffffff; font-size: 12px;">
+                      GRAND TOTAL
+                    </td>
+                    <td class="pdf-cell last-col" style="padding: 12px; text-align: center; color: #ffffff; font-size: 14px; font-weight: bold;">
+                      ${formatCurrency(grandTotal)}
+                    </td>
+                  </tr>
+                `;
+              } else {
+                const tallyRows = dataToExport as TallySummaryRow[];
+                const cashSum = tallyRows.reduce((sum, r) => sum + parseNumber(r.cash), 0);
+                return `
+                  <tr style="background-color: #f8f9fa; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
+                    <td colspan="11" class="pdf-cell" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 11px;">
+                      GRAND TOTAL (CASH)
+                    </td>
+                    <td class="pdf-cell last-col" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 12px;">
+                      ${formatCurrency(cashSum)}
+                    </td>
+                  </tr>
+                `;
+              }
+            })()}
           </tbody>
 
           <!-- Repeating Footer -->
@@ -873,7 +902,7 @@ export default function Dashboard() {
     html2pdf().from(element).set(options).save();
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const isPetty = activeTab === "patty";
     let worksheetData: any[][] = [];
     let sheetName = isPetty ? "Petty Cash" : "Tally Cash";
@@ -886,10 +915,8 @@ export default function Dashboard() {
         return;
       }
 
-      // Row 3 (index 2) is the header according to image
-      // But we should find the row with "Timestamp" or "Date" to be safe
       let headerIdx = rawRows.findIndex(r => r && r.some((c: any) => c?.toString().trim() === "Date"));
-      if (headerIdx === -1) headerIdx = 2; // Fallback to index 2
+      if (headerIdx === -1) headerIdx = 2;
 
       const headers = rawRows[headerIdx];
       const dateColIdx = headers.findIndex((c: any) => c?.toString().trim() === "Date") ?? 2;
@@ -913,9 +940,8 @@ export default function Dashboard() {
         const rawRows = sheetCache[sName];
         if (!rawRows || rawRows.length === 0) return;
 
-        // Find header row (Timestamp/Date)
         let headerIdx = rawRows.findIndex(r => r && r.some((c: any) => c?.toString().trim() === "Date"));
-        if (headerIdx === -1) headerIdx = 2; // Fallback
+        if (headerIdx === -1) headerIdx = 2;
 
         if (commonHeaders.length === 0) {
           commonHeaders = rawRows[headerIdx];
@@ -939,15 +965,116 @@ export default function Dashboard() {
       worksheetData = [commonHeaders, ...combinedData];
     }
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    // Calculate column sums for columns G to AN (indices 6 to 39)
+    const dataRows = worksheetData.slice(1);
+    const colSums: number[] = [];
+    const startCol = 6;
+    const endCol = 39;
+    
+    for (let col = startCol; col <= endCol; col++) {
+      let sum = 0;
+      dataRows.forEach(row => {
+        const val = parseFloat(row[col]) || 0;
+        sum += val;
+      });
+      colSums.push(sum);
+    }
 
-    // Basic styling for the worksheet (setting default column width)
-    const wscols = worksheetData[0].map(() => ({ wch: 15 }));
-    ws['!cols'] = wscols;
+    const grandTotal = colSums.reduce((a, b) => a + b, 0);
 
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `${sheetName.replace(" ", "_")}_Summary_${summaryStartDate || 'Start'}_to_${summaryEndDate || 'End'}.xlsx`);
+    // Create workbook with ExcelJS for styling
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    const maxCols = Math.max(worksheetData[0]?.length || 0, endCol + 1);
+
+    // Row 1: Column-wise sums (Light Red background - only cells with data)
+    const colSumsRowData: any[] = new Array(maxCols).fill("");
+    for (let i = 0; i < colSums.length; i++) {
+      colSumsRowData[startCol + i] = colSums[i];
+    }
+    const colSumsRow = worksheet.addRow(colSumsRowData);
+    
+    // Style Row 1 - Light Red (only cells with data)
+    colSumsRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
+      if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFF6B6B' } // Light red
+        };
+        cell.font = {
+          bold: true,
+          color: { argb: 'FFFFFFFF' } // White text
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    // Row 2: Grand Total row (Dark Red background - only cells with data)
+    const grandTotalRowData: any[] = new Array(maxCols).fill("");
+    grandTotalRowData[2] = "Grand Total";
+    grandTotalRowData[4] = grandTotal;
+    const grandTotalRow = worksheet.addRow(grandTotalRowData);
+    
+    // Style Row 2 - Dark Red (only cells with data)
+    grandTotalRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
+      if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFB71C1C' } // Dark red
+        };
+        cell.font = {
+          bold: true,
+          color: { argb: 'FFFFFFFF' } // White text
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    // Merge cells C-D and E-F in row 2
+    worksheet.mergeCells('C2:D2');
+    worksheet.mergeCells('E2:F2');
+
+    // Row 3: Header row (Blue background - only cells with data)
+    const headerRow = worksheet.addRow(worksheetData[0]);
+    
+    // Style Row 3 - Blue (only cells with data)
+    headerRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
+      if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF4A90D9' } // Blue
+        };
+        cell.font = {
+          bold: true,
+          color: { argb: 'FFFFFFFF' } // White text
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    // Add data rows
+    for (let i = 1; i < worksheetData.length; i++) {
+      worksheet.addRow(worksheetData[i]);
+    }
+
+    // Set column widths
+    for (let i = 1; i <= maxCols; i++) {
+      worksheet.getColumn(i).width = 15;
+    }
+
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sheetName.replace(" ", "_")}_Summary_${summaryStartDate || 'Start'}_to_${summaryEndDate || 'End'}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
 
@@ -986,7 +1113,7 @@ export default function Dashboard() {
       transactionStatus: row[28] || "Pending",
       category: getCategoryFromRow(row),
       description: generateDescription(row),
-      amount: row.slice(5, 26).reduce((a: number, v: any) => a + (parseFloat(v) || 0), 0),
+      amount: row.slice(6, 31).reduce((a: number, v: any) => a + (parseFloat(v) || 0), 0) + (parseFloat(row[35]) || 0),
       status: row[26] || "Pending",
       remarks: "",
       otherPurchaseVoucherNo: "",
@@ -1179,11 +1306,11 @@ export default function Dashboard() {
       // Update stats based on what we processed
       if (activeTab === "patty" && hasPettyData) {
           setOpeningBalance(totalOpening);
-          setTotalExpenses(totalOpening + totalClosing);
+          _setTotalExpenses(totalOpening + totalClosing);
           setClosingBalance(totalClosing);
       } else if (activeTab === "tally") {
           setOpeningBalance(0);
-          setTotalExpenses(0);
+          _setTotalExpenses(0);
           setClosingBalance(0);
       }
 
@@ -1197,10 +1324,12 @@ export default function Dashboard() {
     return matchesSheet && matchesMonth;
   });
 
+
   const totalTransactions = filteredTransactions.length;
+  // Avg Expense = Total Expenses / Total Transactions
   const averageExpense =
     totalTransactions > 0
-      ? filteredTransactions.reduce((sum, t) => sum + t.amount, 0) / totalTransactions
+      ? _totalExpenses / totalTransactions
       : 0;
 
   const stats = [
@@ -1214,7 +1343,7 @@ export default function Dashboard() {
     },
     {
       title: "Total Expenses",
-      value: totalExpenses,
+      value: _totalExpenses,
       icon: FaMoneyBillWave,
       color: "bg-red-500",
       textColor: "text-red-600",
@@ -1639,7 +1768,8 @@ export default function Dashboard() {
       </div>
       )}
 
-      {/* TABLE */}
+      {/* TABLE - Only shown for Patty Cash tab */}
+      {activeTab === "patty" && (
       <TransactionTable
         transactions={filteredTransactions}
         editingStatusId={editingStatusId}
@@ -1653,10 +1783,11 @@ export default function Dashboard() {
         onCancelStatusEdit={() => { setEditingStatusId(null); setTempStatus(""); }}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        selectedTallyOption={activeTab === "tally" ? selectedTallySheet : ""}
+        selectedTallyOption={""}
         onTallyOptionChange={setSelectedTallySheet}
         isLoading={isLoading}
       />
+      )}
       <br />
     </div>
   );

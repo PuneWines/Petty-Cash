@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import PettyCashModal from '../components/PettyCashModal';
 import { Transaction } from '../types';
-import { CategoryAmounts } from '../components/PettyCashModal';
+
 
 interface PettyCashProps {
   onClose?: () => void;
@@ -25,14 +25,10 @@ export default function PettyCash({ onClose = () => {} }: PettyCashProps) {
     localStorage.setItem('pettyCashTransactions', JSON.stringify([newTransaction, ...existingTransactions]));
     
     // Close modal and redirect to transaction history
-    onClose();
+    onClose()
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    if (confirm('Are you sure you want to delete this transaction?')) {
-      setTransactions(transactions.filter((t) => t.id !== id));
-    }
-  };
+
 
   return (
     <div className="space-y-6">
