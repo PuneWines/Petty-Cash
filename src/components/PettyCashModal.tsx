@@ -40,6 +40,7 @@ export interface CategoryAmounts {
   repairMaintenance: string;
   stationary: string;
   incentive: string;
+  incentiveName: string;
   excisePolice: string;
   desiBhada: string;
   otherPurchaseVoucherNo: string;
@@ -88,6 +89,7 @@ export default function PettyCashModal({
     repairMaintenance: "",
     stationary: "",
     incentive: "",
+    incentiveName: "",
     excisePolice: "",
     desiBhada: "",
     otherPurchaseVoucherNo: "",
@@ -239,6 +241,7 @@ export default function PettyCashModal({
           repairMaintenance: "",
           stationary: "",
           incentive: "",
+          incentiveName: "",
           excisePolice: "",
           desiBhada: "",
           otherPurchaseVoucherNo: "",
@@ -350,6 +353,36 @@ export default function PettyCashModal({
         }
       }
 
+      // Calculate Total Expenses sum for Column AO (Index 40)
+      const otherExpensesStageTotal = (
+        (parseFloat(formData.teaNasta) || 0) +
+        (parseFloat(formData.waterJar) || 0) +
+        (parseFloat(formData.lightBill) || 0) +
+        (parseFloat(formData.recharge) || 0) +
+        (parseFloat(formData.postOffice) || 0) +
+        (parseFloat(formData.customerDiscount) || 0) +
+        (parseFloat(formData.repairMaintenance) || 0) +
+        (parseFloat(formData.stationary) || 0) +
+        (parseFloat(formData.petrol) || 0) +
+        (parseFloat(formData.patilPetrol) || 0) +
+        (parseFloat(formData.incentive) || 0) +
+        (parseFloat(formData.excisePolice) || 0) +
+        (parseFloat(formData.desiBhada) || 0) +
+        (parseFloat(formData.roomExpense) || 0) +
+        (parseFloat(formData.officeExpense) || 0) +
+        (parseFloat(formData.personalExpense) || 0) +
+        (parseFloat(formData.miscExpense) || 0) +
+        (parseFloat(formData.creditCardCharges) || 0) +
+        formData.otherExpenses.reduce(
+          (sum, entry) => sum +
+            (parseFloat(entry.advance) || 0) +
+            (parseFloat(entry.breakage) || 0) +
+            (parseFloat(entry.shopAmountOne) || 0) +
+            (parseFloat(entry.medicalAmount) || 0),
+          0
+        )
+      ).toFixed(2);
+
       // Base data that will be repeated for each row
       const baseData = [
         timestamp,
@@ -369,61 +402,69 @@ export default function PettyCashModal({
         formData.petrol,
         formData.patilPetrol,
         formData.incentive,
+        formData.incentiveName, // Added at Column R (Index 17)
       ];
 
       // If there are other expenses, submit one row per entry
       // Otherwise, submit one row with empty other expense fields
       const rowsToSubmit = formData.otherExpenses.length > 0
-        ? formData.otherExpenses.map((entry, idx) => [
-          ...(idx === 0 ? baseData : baseData.map(() => "")),
-          entry.advance,
-          entry.advanceName,
-          entry.breakage,
-          entry.breakageName,
-          entry.shopNameOne,
-          entry.shopAmountOne,
-          entry.medicalPersonName,
-          entry.medicalAmount,
-          idx === 0 ? formData.excisePolice : "",
-          idx === 0 ? formData.desiBhada : "",
-          idx === 0 ? formData.roomExpense : "",
-          idx === 0 ? formData.officeExpense : "",
-          idx === 0 ? formData.personalExpense : "",
-          idx === 0 ? formData.miscExpense : "",
-          idx === 0 ? formData.miscRemarks : "",
-          idx === 0 ? formData.otherPurchaseVoucherNo : "",
-          idx === 0 ? formData.otherVendorPayment : "",
-          idx === 0 ? formData.differenceAmount : "",
-          idx === 0 ? formData.creditCardCharges : "",
-          idx === 0 ? formData.username : "",
-          "",
-          idx === 0 ? formData.transactionStatus : "",
-        ])
+        ? formData.otherExpenses.map((entry, idx) => {
+            const isFirst = idx === 0;
+            const emptyBase = new Array(baseData.length).fill("");
+            
+            return [
+              ...(isFirst ? baseData : emptyBase),
+              entry.advance || "",
+              entry.advanceName || "",
+              entry.breakage || "",
+              entry.breakageName || "",
+              entry.shopNameOne || "",
+              entry.shopAmountOne || "",
+              entry.medicalPersonName || "",
+              entry.medicalAmount || "",
+              isFirst ? (formData.excisePolice || "") : "",
+              isFirst ? (formData.desiBhada || "") : "",
+              isFirst ? (formData.roomExpense || "") : "",
+              isFirst ? (formData.officeExpense || "") : "",
+              isFirst ? (formData.personalExpense || "") : "",
+              isFirst ? (formData.miscExpense || "") : "",
+              isFirst ? (formData.miscRemarks || "") : "",
+              isFirst ? (formData.otherPurchaseVoucherNo || "") : "",
+              isFirst ? (formData.otherVendorPayment || "") : "",
+              isFirst ? (formData.differenceAmount || "") : "",
+              isFirst ? (formData.creditCardCharges || "") : "",
+              isFirst ? (formData.username || "") : "",
+              "", // Column AM (Index 38) - No data stored as it has external formula
+              isFirst ? (formData.transactionStatus || "") : "", // Column AN (Index 39)
+              isFirst ? (otherExpensesStageTotal !== "0.00" ? otherExpensesStageTotal : "") : "", // Column AO (Index 40)
+            ];
+          })
         : [
             [
               ...baseData,
               "", // advance
-              "", // advanceName
+              "",  // advanceName
               "", // breakage
-              "", // breakageName
-              "", // shopNameOne
+              "",  // breakageName
+              "",  // shopNameOne
               "", // shopAmountOne
-              "", // medicalPersonName
+              "",  // medicalPersonName
               "", // medicalAmount
-              formData.excisePolice,
-              formData.desiBhada,
-              formData.roomExpense,
-              formData.officeExpense,
-              formData.personalExpense,
-              formData.miscExpense,
-              formData.miscRemarks,
-              formData.otherPurchaseVoucherNo,
-              formData.otherVendorPayment,
-              formData.differenceAmount,
-              formData.creditCardCharges,
-              formData.username,
-              "",
-              formData.transactionStatus,
+              formData.excisePolice || "",
+              formData.desiBhada || "",
+              formData.roomExpense || "",
+              formData.officeExpense || "",
+              formData.personalExpense || "",
+              formData.miscExpense || "",
+              formData.miscRemarks || "",
+              formData.otherPurchaseVoucherNo || "",
+              formData.otherVendorPayment || "",
+              formData.differenceAmount || "",
+              formData.creditCardCharges || "",
+              formData.username || "",
+              "", // Column AM (Index 38) - No data stored
+              formData.transactionStatus || "", // Column AN (Index 39)
+              otherExpensesStageTotal !== "0.00" ? otherExpensesStageTotal : "", // Column AO (Index 40)
             ],
           ];
 
@@ -843,20 +884,35 @@ export default function PettyCashModal({
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Incentive */}
-                <div>
-                  <label className="block mb-2 text-sm font-semibold text-gray-700">
-                    Incentive
-                  </label>
-                  <input
-                    type="number"
-                    name="incentive"
-                    value={formData.incentive}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    className="px-4 py-3 w-full bg-white rounded-lg border border-gray-300 transition-all focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-1 md:col-span-2 lg:col-span-3">
+                  <div>
+                    <label className="block mb-2 text-sm font-semibold text-gray-700">
+                      Incentive Amount
+                    </label>
+                    <input
+                      type="number"
+                      name="incentive"
+                      value={formData.incentive}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      className="px-4 py-3 w-full bg-white rounded-lg border border-gray-300 transition-all focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 text-sm font-semibold text-gray-700">
+                      Incentive Name
+                    </label>
+                    <input
+                      type="text"
+                      name="incentiveName"
+                      value={formData.incentiveName}
+                      onChange={handleChange}
+                      placeholder="Enter incentive name/reason"
+                      className="px-4 py-3 w-full bg-white rounded-lg border border-gray-300 transition-all focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
 
                 {/* Excise/Police */}

@@ -11,6 +11,7 @@ export interface Transaction {
   repairMaintenance: string;
   stationary: string;
   incentive: string;
+  incentiveName: string;
   breakage: string;
   petrol: string;
   advance: string;
