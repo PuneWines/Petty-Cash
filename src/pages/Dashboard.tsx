@@ -513,8 +513,22 @@ export default function Dashboard() {
   const normalizeToISO = (dateString: string) => {
     if (!dateString) return "";
     let dateStr = dateString.toString().trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
-    const parts = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    
+    // Check for ISO strings with time/timezone to avoid UTC shift
+    if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr) || dateStr.includes('Z')) {
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+    // Match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY or DD MM YYYY
+    const parts = dateStr.match(/^(\d{1,2})[\/\-\.\s](\d{1,2})[\/\-\.\s](\d{2,4})/);
     if (parts) {
         let day = parseInt(parts[1]);
         let month = parseInt(parts[2]);
@@ -568,23 +582,23 @@ export default function Dashboard() {
   };
 
   const getCategoryFromRow = (row: any[]) => {
-    if (parseFloat(row[5]) > 0) return "Tea & Snacks";
-    if (parseFloat(row[6]) > 0) return "Water Jar";
-    if (parseFloat(row[7]) > 0) return "Electricity Bill";
-    if (parseFloat(row[8]) > 0) return "Recharge";
-    if (parseFloat(row[9]) > 0) return "Post Office";
-    if (parseFloat(row[10]) > 0) return "Customer Discount";
-    if (parseFloat(row[11]) > 0) return "Repair & Maintenance";
-    if (parseFloat(row[12]) > 0) return "Stationary";
-    if (parseFloat(row[13]) > 0) return "Petrol";
-    if (parseFloat(row[14]) > 0) return "Patil Petrol";
-    if (parseFloat(row[15]) > 0) return "Incentive";
-    if (parseFloat(row[16]) > 0) return "Advance";
+    if (parseFloat(row[6]) > 0) return "Tea & Snacks";
+    if (parseFloat(row[7]) > 0) return "Water Jar";
+    if (parseFloat(row[8]) > 0) return "Electricity Bill";
+    if (parseFloat(row[9]) > 0) return "Recharge";
+    if (parseFloat(row[10]) > 0) return "Post Office";
+    if (parseFloat(row[11]) > 0) return "Customer Discount";
+    if (parseFloat(row[12]) > 0) return "Repair & Maintenance";
+    if (parseFloat(row[13]) > 0) return "Stationary";
+    if (parseFloat(row[14]) > 0) return "Petrol";
+    if (parseFloat(row[15]) > 0) return "Patil Petrol";
+    if (parseFloat(row[16]) > 0) return "Incentive";
+    if (parseFloat(row[17]) > 0) return "Advance";
     if (parseFloat(row[18]) > 0) return "Breakage";
     if (parseFloat(row[20]) > 0) return "Excise/Police";
     if (parseFloat(row[21]) > 0) return "Desi Bhada";
     if (parseFloat(row[22]) > 0) return "Room Expense";
-    if (parseFloat(row[22]) > 0) return "Office Expense";
+    if (parseFloat(row[23]) > 0) return "Office Expense";
     if (parseFloat(row[24]) > 0) return "Personal Expense";
     if (parseFloat(row[25]) > 0) return "Miscellaneous";
     if (parseFloat(row[26]) > 0) return "Credit Card Charges";
@@ -1058,7 +1072,17 @@ export default function Dashboard() {
 
     // Add data rows
     for (let i = 1; i < worksheetData.length; i++) {
-      worksheet.addRow(worksheetData[i]);
+        const processedRow = worksheetData[i].map(cell => {
+            if (cell && typeof cell === 'string' && (
+                /^\d{4}-\d{2}-\d{2}T/.test(cell) || // ISO strings
+                cell.includes('Z') || 
+                /^\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}/.test(cell) // Date-like strings
+            )) {
+                return normalizeToISO(cell);
+            }
+            return cell;
+        });
+        worksheet.addRow(processedRow);
     }
 
     // Set column widths
@@ -1090,26 +1114,26 @@ export default function Dashboard() {
       name: sheetName === 'Patty Expence' ? (row[27] || "") : (row[3] || ""),
       openingQty: row[3] || "",
       closing: row[4] || "",
-      teaNasta: row[5] || "",
-      waterJar: row[6] || "",
-      lightBill: row[7] || "",
-      recharge: row[8] || "",
-      postOffice: row[9] || "",
-      customerDiscount: row[10] || "",
-      repairMaintenance: row[11] || "",
-      stationary: row[12] || "",
-      petrol: row[13] || "",
-      patilPetrol: row[14] || "",
-      incentive: row[15] || "",
-      advance: row[16] || "",
+      teaNasta: row[6] || "",
+      waterJar: row[7] || "",
+      lightBill: row[8] || "",
+      recharge: row[9] || "",
+      postOffice: row[10] || "",
+      customerDiscount: row[11] || "",
+      repairMaintenance: row[12] || "",
+      stationary: row[13] || "",
+      petrol: row[14] || "",
+      patilPetrol: row[15] || "",
+      incentive: row[16] || "",
+      advance: row[17] || "",
       breakage: row[18] || "",
       excisePolice: row[20] || "",
-      desiBhada: row[20] || "",
-      roomExpense: row[21] || "",
-      officeExpense: row[22] || "",
-      personalExpense: row[23] || "",
-      miscExpense: row[24] || "",
-      creditCardCharges: row[25] || "",
+      desiBhada: row[21] || "",
+      roomExpense: row[22] || "",
+      officeExpense: row[23] || "",
+      personalExpense: row[24] || "",
+      miscExpense: row[25] || "",
+      creditCardCharges: row[26] || "",
       transactionStatus: row[28] || "Pending",
       category: getCategoryFromRow(row),
       description: generateDescription(row),
