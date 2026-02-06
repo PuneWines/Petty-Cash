@@ -21,6 +21,7 @@ export default function CashTally({
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     name: "",
+    shopName: "",
     retailScanAmount: "",
     retail500: "",
     retail200: "",
@@ -63,6 +64,7 @@ export default function CashTally({
   const [totalAmount, setTotalAmount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState<string[]>([]);
+  const [fetchedShopNames, setFetchedShopNames] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
@@ -73,11 +75,38 @@ export default function CashTally({
       const result = await response.json();
 
       if (result.success && Array.isArray(result.data)) {
-        const employeeNames = result.data.map((row: any[]) => row[0]).filter((name) => !!name);
+        const employeeNames = result.data.map((row: any[]) => row[0]).filter((name: string) => !!name);
         setEmployees(employeeNames);
       }
     } catch (error) {
       console.error("Error fetching employees:", error);
+    }
+  };
+
+  const fetchShopNames = async () => {
+    try {
+      const scriptUrl = "https://script.google.com/macros/s/AKfycbx5dryxS1R5zp6myFfUlP1QPimufTqh5hcPcFMNcAJ-FiC-hyQL9mCkgHSbLkOiWTibeg/exec";
+      const response = await fetch(`${scriptUrl}?sheetName=Master&action=getSheetData`);
+      const result = await response.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        // Master sheet Column D is index 3. 
+        // We do not slice(1) here.
+        // API appears to be missing the first data row ("KUNAL ULWE"), so we merge it manually just in case
+        let shopNames = result.data
+          .map((row: any[]) => row[3]) // Column D
+          .filter((name: string) => !!name && name.toLowerCase() !== "shop name");
+
+        // Explicitly ensure 'KUNAL ULWE' is present if missing or if API skipped it
+        shopNames = ["KUNAL ULWE", ...shopNames];
+
+        // Remove duplicates
+        const uniqueShops = Array.from(new Set(shopNames)) as string[];
+
+        setFetchedShopNames(uniqueShops);
+      }
+    } catch (error) {
+      console.error("Error fetching shop names:", error);
     }
   };
 
@@ -89,6 +118,7 @@ export default function CashTally({
         setFormData({
           date: new Date().toISOString().split("T")[0],
           name: "",
+          shopName: "",
           retailScanAmount: "",
           retail500: "",
           retail200: "",
@@ -128,6 +158,7 @@ export default function CashTally({
           voidSale: "",
         });
       } fetchEmployees();
+      fetchShopNames();
     }
   }, [isOpen, initialData]);
 
@@ -176,30 +207,12 @@ export default function CashTally({
 
 
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const scriptUrl = "https://script.google.com/macros/s/AKfycbx5dryxS1R5zp6myFfUlP1QPimufTqh5hcPcFMNcAJ-FiC-hyQL9mCkgHSbLkOiWTibeg/exec";
-        const response = await fetch(`${scriptUrl}?action=getEmployees&sheetName=Login`);
-        const data = await response.json();
-        if (data.success && data.employees) {
-          setEmployees(data.employees);
-        }
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-      }
-    };
-
-    if (isOpen) {
-      fetchEmployees();
-
-    }
-  }, [isOpen]);
 
 
 
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -247,7 +260,8 @@ export default function CashTally({
         generatedId,                    // Column B: Cash Tally ID
         formData.date,                  // Column C: Date
         formData.name,                  // Column D: Employee Name
-        formData.retailScanAmount,      // Column E: Scan Amount
+        formData.shopName,              // Column E: Shop Name
+        formData.retailScanAmount,      // Column F: Scan Amount
         formData.retail500,
         formData.retail200,
         formData.retail100,
@@ -282,9 +296,8 @@ export default function CashTally({
         formData.retail520,
         formData.retail610,
         formData.retail71,
-        formData.wsGpayCard,
-        formData.expenseGpayCard,
-        formData.voidSale
+        formData.voidSale,              // Column AO: Void Sale
+        formData.expenseGpayCard        // Column AP: Expense GPay/Card
       ];
 
 
@@ -356,7 +369,7 @@ export default function CashTally({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="p-6" onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}>
           <div className="space-y-8">
             {/* Basic Information */}
             <div className="bg-[#f5f7fa] rounded-lg p-6">
@@ -398,6 +411,22 @@ export default function CashTally({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Shop Name
+                  </label>
+                  <select
+                    name="shopName"
+                    value={formData.shopName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2a5298] focus:border-transparent transition-all bg-white"
+                  >
+                    <option value="">Select Shop Name</option>
+                    {fetchedShopNames.map((shop, index) => (
+                      <option key={index} value={shop}>{shop}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -413,13 +442,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Scan Amount</label>
                   <input
-                    type="number"
+                    type="text"
                     name="retailScanAmount"
                     value={formData.retailScanAmount}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -430,84 +459,84 @@ export default function CashTally({
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹500</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail500"
                         value={formData.retail500}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹200</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail200"
                         value={formData.retail200}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹100</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail100"
                         value={formData.retail100}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹50</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail50"
                         value={formData.retail50}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹20</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail20"
                         value={formData.retail20}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹10</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail10"
                         value={formData.retail10}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹1</label>
                       <input
-                        type="number"
+                        type="text"
                         name="retail1"
                         value={formData.retail1}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
@@ -517,13 +546,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">GPay/UPI</label>
                   <input
-                    type="number"
+                    type="text"
                     name="retailGpay"
                     value={formData.retailGpay}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -531,13 +560,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Card Payments</label>
                   <input
-                    type="number"
+                    type="text"
                     name="retailCard"
                     value={formData.retailCard}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -580,13 +609,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Cash Billing</label>
                   <input
-                    type="number"
+                    type="text"
                     name="wsCashBillingAmount"
                     value={formData.wsCashBillingAmount}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -594,13 +623,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Credit Billing</label>
                   <input
-                    type="number"
+                    type="text"
                     name="wsCreditBillingAmount"
                     value={formData.wsCreditBillingAmount}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -608,13 +637,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Credit Receipt</label>
                   <input
-                    type="number"
+                    type="text"
                     name="wsCreditReceipt"
                     value={formData.wsCreditReceipt}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -625,84 +654,84 @@ export default function CashTally({
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹500</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws500"
                         value={formData.ws500}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹200</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws200"
                         value={formData.ws200}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹100</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws100"
                         value={formData.ws100}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹50</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws50"
                         value={formData.ws50}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹20</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws20"
                         value={formData.ws20}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹10</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws10"
                         value={formData.ws10}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">₹1</label>
                       <input
-                        type="number"
+                        type="text"
                         name="ws1"
                         value={formData.ws1}
                         onChange={handleChange}
                         placeholder="0"
-                        min="0"
+
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-center bg-white"
                       />
                     </div>
@@ -712,13 +741,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">GPay/Card</label>
                   <input
-                    type="number"
+                    type="text"
                     name="wsGpayCard"
                     value={formData.wsGpayCard}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -750,13 +779,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Card Payments</label>
                   <input
-                    type="number"
+                    type="text"
                     name="wsCard"
                     value={formData.wsCard}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -775,13 +804,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">General Expense</label>
                   <input
-                    type="number"
+                    type="text"
                     name="expense"
                     value={formData.expense}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>
@@ -789,11 +818,12 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Home Delivery</label>
                   <input
-                    type="number"
+                    type="text"
                     name="homeDelivery"
                     value={formData.homeDelivery}
                     onChange={handleChange}
                     placeholder="0.00"
+
                     step="0.01"
                     min="0"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white"
@@ -808,84 +838,84 @@ export default function CashTally({
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹500</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail1500"
                           value={formData.retail1500}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹200</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail2200"
                           value={formData.retail2200}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹100</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail3100"
                           value={formData.retail3100}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹50</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail450"
                           value={formData.retail450}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹20</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail520"
                           value={formData.retail520}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹10</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail610"
                           value={formData.retail610}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">₹1</label>
                         <input
-                          type="number"
+                          type="text"
                           name="retail71"
                           value={formData.retail71}
                           onChange={handleChange}
                           placeholder="0"
-                          min="0"
+
                           className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center bg-white"
                         />
                       </div>
@@ -896,13 +926,13 @@ export default function CashTally({
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Void Sale</label>
                   <input
-                    type="number"
+                    type="text"
                     name="voidSale"
                     value={formData.voidSale}
                     onChange={handleChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+
+
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white"
                   />
                 </div>

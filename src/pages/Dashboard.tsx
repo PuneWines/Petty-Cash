@@ -393,10 +393,10 @@ const CountUpAnimation = ({ end, isLoading = false, duration = 2000 }: { end: nu
   useEffect(() => {
     if (isLoading) {
       const interval = setInterval(() => {
-         setCount(Math.floor(Math.random() * (end > 0 ? end : 100000)));
+        setCount(Math.floor(Math.random() * (end > 0 ? end : 100000)));
       }, 50);
       return () => clearInterval(interval);
-    } 
+    }
     setCount(0);
   }, [isLoading, end]);
 
@@ -455,7 +455,7 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
-  
+
   // Cache States (Hoisted)
   const [rawData, setRawData] = useState<Array<{ sheet: string, data: any[] }>>([]);
   const [sheetCache, setSheetCache] = useState<Record<string, any[]>>({});
@@ -488,7 +488,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const [selectedTallySheet, setSelectedTallySheet] = useState<string>("All");
-  
+
   const { user: currentUser } = useAuth();
 
   const scriptUrl =
@@ -513,16 +513,16 @@ export default function Dashboard() {
   const normalizeToISO = (dateString: string) => {
     if (!dateString) return "";
     let dateStr = dateString.toString().trim();
-    
+
     // Check for ISO strings with time/timezone to avoid UTC shift
     if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr) || dateStr.includes('Z')) {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-            const year = date.getFullYear();
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const day = date.getDate().toString().padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
     }
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -530,30 +530,30 @@ export default function Dashboard() {
     // Match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY or DD MM YYYY
     const parts = dateStr.match(/^(\d{1,2})[\/\-\.\s](\d{1,2})[\/\-\.\s](\d{2,4})/);
     if (parts) {
-        let day = parseInt(parts[1]);
-        let month = parseInt(parts[2]);
-        let year = parseInt(parts[3]);
-        if (year < 100) year += 2000;
-        return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      let day = parseInt(parts[1]);
+      let month = parseInt(parts[2]);
+      let year = parseInt(parts[3]);
+      if (year < 100) year += 2000;
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     }
-    const monthMap: {[key: string]: string} = {
+    const monthMap: { [key: string]: string } = {
       'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
       'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
     };
     const monthParts = dateStr.match(/^(\d{1,2})[\s\-]+([A-Za-z]+)[\s\-,\.]+?(\d{4})/);
     if (monthParts) {
-        const day = monthParts[1].padStart(2, '0');
-        const monthName = monthParts[2].substring(0, 3).toLowerCase();
-        const month = monthMap[monthName] || '01';
-        const year = monthParts[3];
-        return `${year}-${month}-${day}`;
+      const day = monthParts[1].padStart(2, '0');
+      const monthName = monthParts[2].substring(0, 3).toLowerCase();
+      const month = monthMap[monthName] || '01';
+      const year = monthParts[3];
+      return `${year}-${month}-${day}`;
     }
     let date = new Date(dateStr);
     if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const day = date.getDate().toString().padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     return dateStr;
   };
@@ -614,16 +614,16 @@ export default function Dashboard() {
   useEffect(() => {
     const processSummaryData = (data: any[]) => {
       if (!data || !Array.isArray(data)) return;
-      
+
       const dataRows = data.filter(
         (r) => Array.isArray(r) && r.length >= 30
       );
-      
+
       // 1. Process Petty Cash
       // UI: Column O to U (indices 14-20)
       setPettySummaryData(dataRows.filter((r: any[]) => r[14] && r[14].toString().trim().toUpperCase() !== "DATE").map((r: any[], i: number) => ({
-        id: i, date: formatDate(r[14]), voucherNo: "-", 
-        balance: parseNumber(r[15]), dailyExpenses: parseNumber(r[16]), 
+        id: i, date: formatDate(r[14]), voucherNo: "-",
+        balance: parseNumber(r[15]), dailyExpenses: parseNumber(r[16]),
         maintenance: parseNumber(r[17]), fuel: parseNumber(r[18]),
         otherExpenses: parseNumber(r[19]), payments: parseNumber(r[20])
       })));
@@ -634,20 +634,20 @@ export default function Dashboard() {
           .filter((r) => r[14] && r[14].toString().trim().toUpperCase() !== "DATE")
           .map((r, i) => ({
             id: i,
-            date: formatDate(r[14]),          
-            voucherNo: "-",           
-            balance: parseNumber(r[15]),       
-            dailyExpenses: parseNumber(r[16]), 
-            maintenance: parseNumber(r[17]),   
-            fuel: parseNumber(r[18]),          
-            otherExpenses: parseNumber(r[19]), 
-            payments: parseNumber(r[20]),      
+            date: formatDate(r[14]),
+            voucherNo: "-",
+            balance: parseNumber(r[15]),
+            dailyExpenses: parseNumber(r[16]),
+            maintenance: parseNumber(r[17]),
+            fuel: parseNumber(r[18]),
+            otherExpenses: parseNumber(r[19]),
+            payments: parseNumber(r[20]),
           }))
       );
 
       // 2. Process Tally Cash
       const tIdx = data.findIndex((r: any[]) => r && r.some((c: any) => c?.toString().trim() === "Counter Wise"));
-      const tRows = data.slice(tIdx !== -1 ? tIdx + 1 : 4); 
+      const tRows = data.slice(tIdx !== -1 ? tIdx + 1 : 4);
 
       // UI: Column A to K (indices 0-10)
       setTallySummaryData(tRows.filter((r: any[]) => r[1] && r[1].toString().trim().toUpperCase() !== "DATE").map((r: any[], i: number) => ({
@@ -662,18 +662,18 @@ export default function Dashboard() {
       setTallyPdfData(tRows.filter((r: any[]) => r[1] || r[0])
         .filter((r) => r[1] && r[1].toString().trim().toUpperCase() !== "DATE")
         .map((r: any[], i: number) => ({
-          id: i, 
-          counterName: r[0] || "-", 
+          id: i,
+          counterName: r[0] || "-",
           date: formatDate(r[1]),
-          retailAmt: parseNumber(r[2]), 
+          retailAmt: parseNumber(r[2]),
           wsaleAmt: parseNumber(r[3]),
           homeDelivery: parseNumber(r[4]),
           expenses: parseNumber(r[5]),
-          card: parseNumber(r[6]), 
+          card: parseNumber(r[6]),
           paytm: parseNumber(r[7]),
-          gpay: parseNumber(r[8]), 
-          phonePe: parseNumber(r[9]), 
-          cash: parseNumber(r[10]), 
+          gpay: parseNumber(r[8]),
+          phonePe: parseNumber(r[9]),
+          cash: parseNumber(r[10]),
           diff: parseNumber(r[11])
         })));
     };
@@ -707,13 +707,13 @@ export default function Dashboard() {
   const formatDate = (dateString: any) => {
     if (!dateString) return "";
     let date = new Date(dateString);
-    
+
     // Manual parsing for DD/MM/YYYY or DD-MM-YYYY
     if (isNaN(date.getTime())) {
-        const parts = dateString.toString().match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
-        if (parts) {
-            date = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
-        }
+      const parts = dateString.toString().match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+      if (parts) {
+        date = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+      }
     }
 
     if (isNaN(date.getTime())) return dateString.toString();
@@ -729,24 +729,24 @@ export default function Dashboard() {
   const handleExportPDF = () => {
     const isPetty = activeTab === "patty";
     const sourceData = isPetty ? pettyPdfData : tallyPdfData;
-    
-    const dataToExport = isPetty 
+
+    const dataToExport = isPetty
       ? (sourceData as SummaryRow[]).filter(row => isRowInRange(row.date))
       : (sourceData as TallySummaryRow[]).filter(row => {
-          const matchesCounter = selectedTallySheet === "All" || row.counterName === selectedTallySheet;
-          return matchesCounter && isRowInRange(row.date);
-        });
+        const matchesCounter = selectedTallySheet === "All" || row.counterName === selectedTallySheet;
+        return matchesCounter && isRowInRange(row.date);
+      });
 
-    const formattedPeriodStart = summaryStartDate 
+    const formattedPeriodStart = summaryStartDate
       ? new Date(summaryStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
       : "01 November 2025";
-    const formattedPeriodEnd = summaryEndDate 
+    const formattedPeriodEnd = summaryEndDate
       ? new Date(summaryEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
       : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
     const generatedOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const title = isPetty ? "PETTY CASH REPORT" : "TALLY CASH REPORT";
-    const headers = isPetty 
+    const headers = isPetty
       ? ["DATE", "Purchase Voucher No.", "Opening & Closing Balance", "Daily Expenses", "Maintenance & Repairs", "Fuel & Transport", "Other Expenses", "Payments & Vendors"]
       : ["Counter", "Date", "Retail Amt", "Wholesale Amt", "Home Delivery", "Expenses", "Card", "UPI/Paytm", "G-Pay", "PhonePe", "Cash", "Diff"];
 
@@ -815,10 +815,10 @@ export default function Dashboard() {
           <!-- Table Body Content -->
           <tbody style="display: table-row-group;">
             ${dataToExport.map((row, idx) => {
-              const isLastRow = idx === dataToExport.length - 1;
-              if (isPetty) {
-                const r = row as SummaryRow;
-                return `
+      const isLastRow = idx === dataToExport.length - 1;
+      if (isPetty) {
+        const r = row as SummaryRow;
+        return `
                   <tr style="page-break-inside: avoid; break-inside: avoid;" class="${isLastRow ? 'last-row' : ''}">
                     <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.date}</td>
                     <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">PVN - ${String(idx + 1).padStart(2, '0')}</td>
@@ -830,9 +830,9 @@ export default function Dashboard() {
                     <td class="pdf-cell last-col" style="padding: 8px 4px; text-align: center; font-size: 10px; color: #e65100; font-weight: bold;">${formatCurrency(parseNumber(r.payments))}</td>
                   </tr>
                 `;
-              } else {
-                const r = row as any;
-                return `
+      } else {
+        const r = row as any;
+        return `
                   <tr style="page-break-inside: avoid; break-inside: avoid;" class="${isLastRow ? 'last-row' : ''}">
                     <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.counterName}</td>
                     <td class="pdf-cell" style="padding: 8px 4px; text-align: center; font-size: 10px;">${r.date}</td>
@@ -848,23 +848,23 @@ export default function Dashboard() {
                     <td class="pdf-cell last-col" style="padding: 8px 4px; text-align: center; font-size: 10px; font-weight: bold; color: ${parseNumber(r.diff) !== 0 ? '#d32f2f' : '#2e7d32'}">${formatCurrency(parseNumber(r.diff))}</td>
                   </tr>
                 `;
-              }
-            }).join('')}
+      }
+    }).join('')}
             
             <!-- Grand Total Row -->
             ${(() => {
-              if (isPetty) {
-                const pettyRows = dataToExport as SummaryRow[];
-                // Calculate column-wise sums
-                const balanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.balance), 0);
-                const dailyExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.dailyExpenses), 0);
-                const maintenanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.maintenance), 0);
-                const fuelSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.fuel), 0);
-                const otherExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.otherExpenses), 0);
-                const paymentsSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.payments), 0);
-                // Grand Total = sum of all column sums
-                const grandTotal = balanceSum + dailyExpensesSum + maintenanceSum + fuelSum + otherExpensesSum + paymentsSum;
-                return `
+        if (isPetty) {
+          const pettyRows = dataToExport as SummaryRow[];
+          // Calculate column-wise sums
+          const balanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.balance), 0);
+          const dailyExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.dailyExpenses), 0);
+          const maintenanceSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.maintenance), 0);
+          const fuelSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.fuel), 0);
+          const otherExpensesSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.otherExpenses), 0);
+          const paymentsSum = pettyRows.reduce((sum, r) => sum + parseNumber(r.payments), 0);
+          // Grand Total = sum of all column sums
+          const grandTotal = balanceSum + dailyExpensesSum + maintenanceSum + fuelSum + otherExpensesSum + paymentsSum;
+          return `
                   <tr style="background-color: #b71c1c; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
                     <td colspan="7" class="pdf-cell" style="padding: 12px; text-align: center; color: #ffffff; font-size: 12px;">
                       GRAND TOTAL
@@ -874,10 +874,10 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 `;
-              } else {
-                const tallyRows = dataToExport as TallySummaryRow[];
-                const cashSum = tallyRows.reduce((sum, r) => sum + parseNumber(r.cash), 0);
-                return `
+        } else {
+          const tallyRows = dataToExport as TallySummaryRow[];
+          const cashSum = tallyRows.reduce((sum, r) => sum + parseNumber(r.cash), 0);
+          return `
                   <tr style="background-color: #f8f9fa; font-weight: bold; page-break-inside: avoid; break-inside: avoid;" class="last-row">
                     <td colspan="11" class="pdf-cell" style="padding: 10px; text-align: center; color: #b71c1c; font-size: 11px;">
                       GRAND TOTAL (CASH)
@@ -887,8 +887,8 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 `;
-              }
-            })()}
+        }
+      })()}
           </tbody>
 
           <!-- Repeating Footer -->
@@ -902,7 +902,7 @@ export default function Dashboard() {
 
     const element = document.createElement('div');
     element.innerHTML = printContent;
-    
+
     const options = {
       margin: 10,
       filename: `${isPetty ? 'Petty_Cash' : 'Tally_Cash'}_Report_${new Date().getTime()}.pdf`,
@@ -921,7 +921,7 @@ export default function Dashboard() {
     let worksheetData: any[][] = [];
     let sheetName = isPetty ? "Petty Cash" : "Tally Cash";
 
-    if (isPetty) { 
+    if (isPetty) {
       // Use raw from 'Patty Expence' sheet
       const rawRows = sheetCache["Patty Expence"];
       if (!rawRows || rawRows.length === 0) {
@@ -943,7 +943,7 @@ export default function Dashboard() {
       worksheetData = [headers, ...filteredData];
     } else {
       // Tally Cash (using raw sheets)
-      const sheetsToProcess = selectedTallySheet === "All" 
+      const sheetsToProcess = selectedTallySheet === "All"
         ? ["Cash Tally Counter 1", "Cash Tally Counter 2", "Cash Tally Counter 3"]
         : [selectedTallySheet];
 
@@ -984,7 +984,7 @@ export default function Dashboard() {
     const colSums: number[] = [];
     const startCol = 6;
     const endCol = 39;
-    
+
     for (let col = startCol; col <= endCol; col++) {
       let sum = 0;
       dataRows.forEach(row => {
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
       colSumsRowData[startCol + i] = colSums[i];
     }
     const colSumsRow = worksheet.addRow(colSumsRowData);
-    
+
     // Style Row 1 - Light Red (only cells with data)
     colSumsRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
       if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
@@ -1030,7 +1030,7 @@ export default function Dashboard() {
     grandTotalRowData[2] = "Grand Total";
     grandTotalRowData[4] = grandTotal;
     const grandTotalRow = worksheet.addRow(grandTotalRowData);
-    
+
     // Style Row 2 - Dark Red (only cells with data)
     grandTotalRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
       if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
@@ -1053,7 +1053,7 @@ export default function Dashboard() {
 
     // Row 3: Header row (Blue background - only cells with data)
     const headerRow = worksheet.addRow(worksheetData[0]);
-    
+
     // Style Row 3 - Blue (only cells with data)
     headerRow.eachCell({ includeEmpty: false }, (cell, _colNumber) => {
       if (cell.value !== "" && cell.value !== null && cell.value !== undefined) {
@@ -1072,17 +1072,17 @@ export default function Dashboard() {
 
     // Add data rows
     for (let i = 1; i < worksheetData.length; i++) {
-        const processedRow = worksheetData[i].map(cell => {
-            if (cell && typeof cell === 'string' && (
-                /^\d{4}-\d{2}-\d{2}T/.test(cell) || // ISO strings
-                cell.includes('Z') || 
-                /^\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}/.test(cell) // Date-like strings
-            )) {
-                return normalizeToISO(cell);
-            }
-            return cell;
-        });
-        worksheet.addRow(processedRow);
+      const processedRow = worksheetData[i].map(cell => {
+        if (cell && typeof cell === 'string' && (
+          /^\d{4}-\d{2}-\d{2}T/.test(cell) || // ISO strings
+          cell.includes('Z') ||
+          /^\d{1,2}[\/\-\.\s]\d{1,2}[\/\-\.\s]\d{2,4}/.test(cell) // Date-like strings
+        )) {
+          return normalizeToISO(cell);
+        }
+        return cell;
+      });
+      worksheet.addRow(processedRow);
     }
 
     // Set column widths
@@ -1107,7 +1107,7 @@ export default function Dashboard() {
 
   // Helper to convert sheet rows into Transaction objects
   const mapRowsToTransactions = (rows: any[], sheetName: string, currentTotalCount: number): Transaction[] => {
-     return rows.map((row: any[], index: number) => ({
+    return rows.map((row: any[], index: number) => ({
       id: row[1] ? row[1].toString() : (currentTotalCount + index + 1).toString(),
       rowIndex: index + 2,
       date: normalizeToISO(row[2] || ""),
@@ -1137,7 +1137,7 @@ export default function Dashboard() {
       transactionStatus: row[28] || "Pending",
       category: getCategoryFromRow(row),
       description: generateDescription(row),
-      amount: row.slice(6, 31).reduce((a: number, v: any) => a + (parseFloat(v) || 0), 0) + (parseFloat(row[35]) || 0),
+      amount: parseFloat(row[38]) || 0, // Using Total Exp. from Column AM (Index 38) as requested
       status: row[26] || "Pending",
       remarks: "",
       otherPurchaseVoucherNo: "",
@@ -1152,12 +1152,12 @@ export default function Dashboard() {
   // --- Effect 1: Fetch Data on Tab/User Change (ONLY) ---
   useEffect(() => {
     if (!currentUser) {
-        setIsLoading(false);
-        return;
+      setIsLoading(false);
+      return;
     }
 
     const fetchData = async () => {
-      
+
       // 1. Determine which sheets are needed
       let sheetsToFetch: string[] = [];
       if (activeTab === "patty") {
@@ -1174,18 +1174,18 @@ export default function Dashboard() {
       // If we have everything, just update rawData and return (Instant!)
       if (missingSheets.length === 0) {
         const cachedResults = sheetsToFetch.map(sheet => ({
-            sheet,
-            data: filterDataByUser(sheetCache[sheet], sheet, currentUser)
+          sheet,
+          data: filterDataByUser(sheetCache[sheet], sheet, currentUser)
         }));
         setRawData(cachedResults);
-        setIsLoading(false); 
+        setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      
+
       // Safety timeout
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 15000)
       );
 
@@ -1197,7 +1197,7 @@ export default function Dashboard() {
               try {
                 const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(sheet)}&action=fetch`);
                 const json = await res.json();
-                
+
                 // Store RAW data in cache (unfiltered)
                 const allData = (json.success && json.data) ? json.data : [];
                 return { sheet, data: allData };
@@ -1210,23 +1210,23 @@ export default function Dashboard() {
 
           // 4. Update Cache
           setSheetCache(prev => {
-              const newCache = { ...prev };
-              newSheetResults.forEach(item => {
-                  newCache[item.sheet] = item.data;
-              });
-              return newCache;
+            const newCache = { ...prev };
+            newSheetResults.forEach(item => {
+              newCache[item.sheet] = item.data;
+            });
+            return newCache;
           });
 
           // 5. Combine cached data + new data for current view
           const finalResults = sheetsToFetch.map(sheet => {
-              // Try finding in new results
-              const newRes = newSheetResults.find(r => r.sheet === sheet);
-              const data = newRes ? newRes.data : (sheetCache[sheet] || []);
-              
-              return {
-                  sheet,
-                  data: filterDataByUser(data, sheet, currentUser)
-              };
+            // Try finding in new results
+            const newRes = newSheetResults.find(r => r.sheet === sheet);
+            const data = newRes ? newRes.data : (sheetCache[sheet] || []);
+
+            return {
+              sheet,
+              data: filterDataByUser(data, sheet, currentUser)
+            };
           });
 
           setRawData(finalResults);
@@ -1252,91 +1252,91 @@ export default function Dashboard() {
 
   // --- Effect 2: Process Data on RawData or Month Change ---
   useEffect(() => {
-     // If no data, do nothing yet. Wait for fetch.
-     if (!rawData || rawData.length === 0) return;
+    // If no data, do nothing yet. Wait for fetch.
+    if (!rawData || rawData.length === 0) return;
 
-      let accumulatedTransactions: Transaction[] = [];
-      let totalOpening = 0;
-      let totalClosing = 0;
-      let hasPettyData = false;
+    let accumulatedTransactions: Transaction[] = [];
+    let totalOpening = 0;
+    let totalClosing = 0;
+    let hasPettyData = false;
 
-      for (const { sheet, data } of rawData) {
-        
-        // Stats Calculation: ONLY for Patty Cash tab
-        // Removing strict 'Patty Expence' check to rely on activeTab
-        if (activeTab === "patty") {
-             // 1. Calculate Stats
-             let foundTotalRow = false;
-             let openingSum = 0;
-             let closingSum = 0;
-             let manualOpeningSum = 0;
-             let manualClosingSum = 0;
-             
-             // Debug data presence
-             console.log(`Processing sheet: ${sheet}, Rows: ${data.length}`);
+    for (const { sheet, data } of rawData) {
 
-             for (let i = 0; i < data.length; i++) {
-                 const row = data[i];
-                 if (!row || row.length < 5) continue;
+      // Stats Calculation: ONLY for Patty Cash tab
+      // Removing strict 'Patty Expence' check to rely on activeTab
+      if (activeTab === "patty") {
+        // 1. Calculate Stats
+        let foundTotalRow = false;
+        let openingSum = 0;
+        let closingSum = 0;
+        let manualOpeningSum = 0;
+        let manualClosingSum = 0;
 
-                 // Robust check for "Total" in first 3 columns
-                 const col0 = row[0] ? row[0].toString().trim().toLowerCase() : "";
-                 const col1 = row[1] ? row[1].toString().trim().toLowerCase() : "";
-                 const col2 = row[2] ? row[2].toString().trim().toLowerCase() : "";
+        // Debug data presence
+        console.log(`Processing sheet: ${sheet}, Rows: ${data.length}`);
 
-                 if (col0 === 'total' || col1 === 'total' || col2 === 'total') {
-                     openingSum = parseNumber(row[3]);
-                     closingSum = parseNumber(row[4]);
-                     foundTotalRow = true;
-                     // console.log("Found Total Row at index", i);
-                 } else {
-                     // Accumulate manual sum (skipping headers/Total if logically found, 
-                     // but here we are in loop, so we sum everything else just in case Total is missing)
-                     // If we eventually find Total, we override this manual sum.
-                     
-                     // Simple heuristic to avoid headers: check if Col D is a valid number
-                     const opVal = parseNumber(row[3]);
-                     const clVal = parseNumber(row[4]);
-                     manualOpeningSum += opVal;
-                     manualClosingSum += clVal;
-                 }
-             }
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length < 5) continue;
 
-             if (foundTotalRow) {
-                 totalOpening = openingSum;
-                 totalClosing = closingSum;
-                 console.log("Using Total Row values");
-             } else {
-                 // For filtered views (non-admin) or if Total row missing
-                 totalOpening = manualOpeningSum;
-                 totalClosing = manualClosingSum;
-                 console.log("Using Manual Sum values:", manualOpeningSum, manualClosingSum);
-             }
-             
-             hasPettyData = true;
+          // Robust check for "Total" in first 3 columns
+          const col0 = row[0] ? row[0].toString().trim().toLowerCase() : "";
+          const col1 = row[1] ? row[1].toString().trim().toLowerCase() : "";
+          const col2 = row[2] ? row[2].toString().trim().toLowerCase() : "";
+
+          if (col0 === 'total' || col1 === 'total' || col2 === 'total') {
+            openingSum = parseNumber(row[3]);
+            closingSum = parseNumber(row[4]);
+            foundTotalRow = true;
+            // console.log("Found Total Row at index", i);
+          } else {
+            // Accumulate manual sum (skipping headers/Total if logically found, 
+            // but here we are in loop, so we sum everything else just in case Total is missing)
+            // If we eventually find Total, we override this manual sum.
+
+            // Simple heuristic to avoid headers: check if Col D is a valid number
+            const opVal = parseNumber(row[3]);
+            const clVal = parseNumber(row[4]);
+            manualOpeningSum += opVal;
+            manualClosingSum += clVal;
+          }
         }
 
-        // Transactions: Filter by month for the table
-        const dataForTable = data.filter(row => {
-            const rowDate = normalizeToISO(row[2] ? row[2].toString() : "");
-            return rowDate.startsWith(selectedMonth);
-        });
-        const newTransactions = mapRowsToTransactions(dataForTable, sheet, accumulatedTransactions.length);
-        accumulatedTransactions.push(...newTransactions);
+        if (foundTotalRow) {
+          totalOpening = openingSum;
+          totalClosing = closingSum;
+          console.log("Using Total Row values");
+        } else {
+          // For filtered views (non-admin) or if Total row missing
+          totalOpening = manualOpeningSum;
+          totalClosing = manualClosingSum;
+          console.log("Using Manual Sum values:", manualOpeningSum, manualClosingSum);
+        }
+
+        hasPettyData = true;
       }
 
-      setTransactions(accumulatedTransactions);
-      
-      // Update stats based on what we processed
-      if (activeTab === "patty" && hasPettyData) {
-          setOpeningBalance(totalOpening);
-          _setTotalExpenses(totalOpening + totalClosing);
-          setClosingBalance(totalClosing);
-      } else if (activeTab === "tally") {
-          setOpeningBalance(0);
-          _setTotalExpenses(0);
-          setClosingBalance(0);
-      }
+      // Transactions: Filter by month for the table
+      const dataForTable = data.filter(row => {
+        const rowDate = normalizeToISO(row[2] ? row[2].toString() : "");
+        return rowDate.startsWith(selectedMonth);
+      });
+      const newTransactions = mapRowsToTransactions(dataForTable, sheet, accumulatedTransactions.length);
+      accumulatedTransactions.push(...newTransactions);
+    }
+
+    setTransactions(accumulatedTransactions);
+
+    // Update stats based on what we processed
+    if (activeTab === "patty" && hasPettyData) {
+      setOpeningBalance(totalOpening);
+      _setTotalExpenses(totalOpening + totalClosing);
+      setClosingBalance(totalClosing);
+    } else if (activeTab === "tally") {
+      setOpeningBalance(0);
+      _setTotalExpenses(0);
+      setClosingBalance(0);
+    }
 
   }, [rawData, selectedMonth, activeTab]);
 
@@ -1536,281 +1536,279 @@ export default function Dashboard() {
         })}
       </div>
 
-     {/* TABS & DROPDOWN (Moved from TransactionTable) */}
+      {/* TABS & DROPDOWN (Moved from TransactionTable) */}
       <div className="flex items-center justify-between">
         <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
           <button
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "patty"
+            className={`px-4 py-2 text-sm font-medium ${activeTab === "patty"
                 ? "bg-blue-500 text-white"
                 : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
+              }`}
             onClick={() => setActiveTab("patty")}
           >
             Patty Cash
           </button>
           <button
-            className={`px-4 py-2 text-sm font-medium border-l border-gray-200 ${
-              activeTab === "tally"
+            className={`px-4 py-2 text-sm font-medium border-l border-gray-200 ${activeTab === "tally"
                 ? "bg-blue-500 text-white"
                 : "bg-white text-gray-700 hover:bg-gray-100"
-            }`}
+              }`}
             onClick={() => setActiveTab("tally")}
           >
             Tally Cash
           </button>
         </div>
-        
+
 
       </div>
 
       {/* SUMMARY TABLE (Visible only activeTab is Patty) */}
       {activeTab === "patty" && (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-800">Day-wise Summary</h3>
             <div className="flex items-center gap-3">
-               {/* Export Buttons */}
-               <div className="flex items-center gap-2 mr-2">
-                 <button 
-                   onClick={handleExportPDF}
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
-                 >
-                   <FaFilePdf className="text-sm" /> Export PDF
-                 </button>
-                 <button 
-                   onClick={handleExportExcel}
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
-                 >
-                   <FaFileExcel className="text-sm" /> Export Excel
-                 </button>
-               </div>
+              {/* Export Buttons */}
+              <div className="flex items-center gap-2 mr-2">
+                <button
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
+                >
+                  <FaFilePdf className="text-sm" /> Export PDF
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
+                >
+                  <FaFileExcel className="text-sm" /> Export Excel
+                </button>
+              </div>
 
-               <div className="flex items-center gap-2">
-                 <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
-                 <input 
-                   type="date" 
-                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                   value={summaryStartDate}
-                   onChange={(e) => setSummaryStartDate(e.target.value)}
-                 />
-               </div>
-               <div className="flex items-center gap-2">
-                 <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
-                 <input 
-                   type="date" 
-                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                   value={summaryEndDate}
-                   onChange={(e) => setSummaryEndDate(e.target.value)}
-                 />
-               </div>
-               {(summaryStartDate || summaryEndDate) && (
-                   <button 
-                     onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
-                     className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
-                   >
-                     Clear
-                   </button>
-               )}
-            </div>
-        </div>
-        <div className="overflow-auto max-h-[500px] hide-scrollbar">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[150px]">Opening & Closing<br/>Balance</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Daily<br/>Expenses</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Maintenance<br/>& Repairs</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Fuel &<br/>Transport</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Other<br/>Expenses</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Payments &<br/>Vendors</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {isSummaryLoading ? (
-                 <tr>
-                    <td colSpan={11} className="px-6 py-12 text-center">
-                        <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p className="text-sm text-gray-500">Loading summary...</p>
-                    </td>
-                 </tr>
-              ) : pettySummaryData.filter(row => isRowInRange(row.date)).length === 0 ? (
-                <tr>
-                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">
-                     No Data Found
-                   </td>
-                </tr>
-              ) : (
-                pettySummaryData
-                  .filter(row => isRowInRange(row.date))
-                  .map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
-                    <td className="px-6 py-4 text-center text-gray-700 font-medium">{formatCurrency(parseFloat(row.balance.toString()))}</td>
-                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.dailyExpenses.toString()))}</td>
-                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.maintenance.toString()))}</td>
-                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.fuel.toString()))}</td>
-                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.otherExpenses.toString()))}</td>
-                    <td className="px-6 py-4 text-center text-orange-600">{formatCurrency(parseFloat(row.payments.toString()))}</td>
-                  </tr>
-                ))
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
+                <input
+                  type="date"
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={summaryStartDate}
+                  onChange={(e) => setSummaryStartDate(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
+                <input
+                  type="date"
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={summaryEndDate}
+                  onChange={(e) => setSummaryEndDate(e.target.value)}
+                />
+              </div>
+              {(summaryStartDate || summaryEndDate) && (
+                <button
+                  onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
+                  className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                >
+                  Clear
+                </button>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
+          <div className="overflow-auto max-h-[500px] hide-scrollbar">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
+                <tr>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[150px]">Opening & Closing<br />Balance</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Daily<br />Expenses</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Maintenance<br />& Repairs</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Fuel &<br />Transport</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[130px]">Other<br />Expenses</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[140px]">Payments &<br />Vendors</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isSummaryLoading ? (
+                  <tr>
+                    <td colSpan={11} className="px-6 py-12 text-center">
+                      <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">Loading summary...</p>
+                    </td>
+                  </tr>
+                ) : pettySummaryData.filter(row => isRowInRange(row.date)).length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">
+                      No Data Found
+                    </td>
+                  </tr>
+                ) : (
+                  pettySummaryData
+                    .filter(row => isRowInRange(row.date))
+                    .map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
+                        <td className="px-6 py-4 text-center text-gray-700 font-medium">{formatCurrency(parseFloat(row.balance.toString()))}</td>
+                        <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.dailyExpenses.toString()))}</td>
+                        <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.maintenance.toString()))}</td>
+                        <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.fuel.toString()))}</td>
+                        <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat(row.otherExpenses.toString()))}</td>
+                        <td className="px-6 py-4 text-center text-orange-600">{formatCurrency(parseFloat(row.payments.toString()))}</td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       )}
 
       {/* TALLY SUMMARY TABLE (Visible only activeTab is Tally) */}
       {activeTab === "tally" && (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-800">Tally Summary</h3>
             <div className="flex items-center gap-3">
-               {/* Export Buttons */}
-               <div className="flex items-center gap-2 mr-2">
-                 <button 
-                   onClick={handleExportPDF}
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
-                 >
-                   <FaFilePdf className="text-sm" /> Export PDF
-                 </button>
-                 <button 
-                   onClick={handleExportExcel}
-                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
-                 >
-                   <FaFileExcel className="text-sm" /> Export Excel
-                 </button>
-               </div>
+              {/* Export Buttons */}
+              <div className="flex items-center gap-2 mr-2">
+                <button
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all shadow-sm"
+                >
+                  <FaFilePdf className="text-sm" /> Export PDF
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 text-xs font-bold rounded-lg border border-green-200 hover:bg-green-100 transition-all shadow-sm"
+                >
+                  <FaFileExcel className="text-sm" /> Export Excel
+                </button>
+              </div>
 
-               <div className="flex items-center gap-2">
-                 <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
-                 <input 
-                   type="date" 
-                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                   value={summaryStartDate}
-                   onChange={(e) => setSummaryStartDate(e.target.value)}
-                 />
-               </div>
-               <div className="flex items-center gap-2">
-                 <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
-                 <input 
-                   type="date" 
-                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                   value={summaryEndDate}
-                   onChange={(e) => setSummaryEndDate(e.target.value)}
-                 />
-               </div>
-                {(summaryStartDate || summaryEndDate) && (
-                   <button 
-                     onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
-                     className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
-                   >
-                     Clear
-                   </button>
-               )}
-               {/* Moved Dropdown here */}
-               <select
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 font-semibold uppercase">Start Date:</label>
+                <input
+                  type="date"
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={summaryStartDate}
+                  onChange={(e) => setSummaryStartDate(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 font-semibold uppercase">End Date:</label>
+                <input
+                  type="date"
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={summaryEndDate}
+                  onChange={(e) => setSummaryEndDate(e.target.value)}
+                />
+              </div>
+              {(summaryStartDate || summaryEndDate) && (
+                <button
+                  onClick={() => { setSummaryStartDate(""); setSummaryEndDate(""); }}
+                  className="px-3 py-1 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                >
+                  Clear
+                </button>
+              )}
+              {/* Moved Dropdown here */}
+              <select
                 className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                 value={selectedTallySheet}
                 onChange={(e) => setSelectedTallySheet(e.target.value)}
-               >
+              >
                 {TALLY_SHEET_OPTIONS.map((option) => (
                   <option key={option.sheet} value={option.sheet}>
                     {option.label}
                   </option>
                 ))}
-               </select>
+              </select>
             </div>
-        </div>
-        <div className="overflow-auto max-h-[500px] hide-scrollbar">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Retail<br/>Amt</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Wholesale<br/>Amt</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Home<br/>Delivery</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Expenses</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Card</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">UPI/Paytm</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">G-Pay</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">PhonePe</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Cash</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Diff</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-             {isSummaryLoading ? (
-                 <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
-                        <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p className="text-sm text-gray-500">Loading tally summary...</p>
-                    </td>
-                 </tr>
-              ) : tallySummaryData
-                .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
-                .filter(row => isRowInRange(row.date))
-                .length === 0 ? (
+          </div>
+          <div className="overflow-auto max-h-[500px] hide-scrollbar">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-blue-100 text-gray-700 font-bold uppercase border-b border-gray-200 sticky top-0 z-10">
                 <tr>
-                   <td colSpan={11} className="px-6 py-8 text-center text-gray-500 font-medium">
-                     No Data Found
-                   </td>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Date</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Retail<br />Amt</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Wholesale<br />Amt</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Home<br />Delivery</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[120px]">Expenses</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Card</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">UPI/Paytm</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">G-Pay</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">PhonePe</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Cash</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center min-w-[100px]">Diff</th>
                 </tr>
-              ) : (
-                tallySummaryData
-                  .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
-                  .filter(row => isRowInRange(row.date))
-                  .map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
-                    <td className="px-6 py-4 text-center text-green-600 font-medium">{formatCurrency(parseFloat((row.retailAmt || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-green-600">{formatCurrency(parseFloat((row.wsaleAmt || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-blue-600">{formatCurrency(parseFloat((row.homeDelivery || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat((row.expenses || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.card || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.paytm || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.gpay || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.phonePe || 0).toString()))}</td>
-                    <td className="px-6 py-4 text-center text-gray-900 font-bold">{formatCurrency(parseFloat((row.cash || 0).toString()))}</td>
-                    <td className={`px-6 py-4 text-center font-bold ${parseFloat((row.diff || 0).toString()) !== 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        {formatCurrency(parseFloat((row.diff || 0).toString()))}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isSummaryLoading ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center">
+                      <svg className="animate-spin h-8 w-8 text-[#2a5298] mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-sm text-gray-500">Loading tally summary...</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : tallySummaryData
+                  .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
+                  .filter(row => isRowInRange(row.date))
+                  .length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-6 py-8 text-center text-gray-500 font-medium">
+                      No Data Found
+                    </td>
+                  </tr>
+                ) : (
+                  tallySummaryData
+                    .filter(row => selectedTallySheet === "All" || row.counterName === selectedTallySheet)
+                    .filter(row => isRowInRange(row.date))
+                    .map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 font-medium text-gray-800 whitespace-nowrap text-center">{row.date}</td>
+                        <td className="px-6 py-4 text-center text-green-600 font-medium">{formatCurrency(parseFloat((row.retailAmt || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-green-600">{formatCurrency(parseFloat((row.wsaleAmt || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-blue-600">{formatCurrency(parseFloat((row.homeDelivery || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-red-600">{formatCurrency(parseFloat((row.expenses || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.card || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.paytm || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.gpay || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-gray-700">{formatCurrency(parseFloat((row.phonePe || 0).toString()))}</td>
+                        <td className="px-6 py-4 text-center text-gray-900 font-bold">{formatCurrency(parseFloat((row.cash || 0).toString()))}</td>
+                        <td className={`px-6 py-4 text-center font-bold ${parseFloat((row.diff || 0).toString()) !== 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          {formatCurrency(parseFloat((row.diff || 0).toString()))}
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       )}
 
       {/* TABLE - Only shown for Patty Cash tab */}
       {activeTab === "patty" && (
-      <TransactionTable
-        transactions={filteredTransactions}
-        editingStatusId={editingStatusId}
-        tempStatus={tempStatus}
-        onEditStatus={(id, status) => {
-          setEditingStatusId(id);
-          setTempStatus(status);
-        }}
-        onStatusChange={setTempStatus}
-        onSaveStatus={async () => { setEditingStatusId(null); }}
-        onCancelStatusEdit={() => { setEditingStatusId(null); setTempStatus(""); }}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        selectedTallyOption={""}
-        onTallyOptionChange={setSelectedTallySheet}
-        isLoading={isLoading}
-      />
+        <TransactionTable
+          transactions={filteredTransactions}
+          editingStatusId={editingStatusId}
+          tempStatus={tempStatus}
+          onEditStatus={(id, status) => {
+            setEditingStatusId(id);
+            setTempStatus(status);
+          }}
+          onStatusChange={setTempStatus}
+          onSaveStatus={async () => { setEditingStatusId(null); }}
+          onCancelStatusEdit={() => { setEditingStatusId(null); setTempStatus(""); }}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          selectedTallyOption={""}
+          onTallyOptionChange={setSelectedTallySheet}
+          isLoading={isLoading}
+        />
       )}
       <br />
     </div>

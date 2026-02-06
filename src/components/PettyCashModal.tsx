@@ -111,12 +111,13 @@ export default function PettyCashModal({
   });
 
   const [totalAmount, setTotalAmount] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchedUsers, setFetchedUsers] = useState<string[]>([]);
   const [fetchedShopNames, setFetchedShopNames] = useState<string[]>([]);
   const [showMiscRemarks, setShowMiscRemarks] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  
+
   const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
   const shopDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -136,17 +137,20 @@ export default function PettyCashModal({
 
 
   useEffect(() => {
-    const otherExpensesTotal = formData.otherExpenses.reduce(
-      (sum, entry) => sum +
-        (parseFloat(entry.advance) || 0) +
-        (parseFloat(entry.breakage) || 0) +
-        (parseFloat(entry.shopAmountOne) || 0) +
-        (parseFloat(entry.medicalAmount) || 0),
-      0
-    );
+    const otherExpensesTotal = formData.otherExpenses.reduce((sum, entry) => {
+      const advance = parseFloat(entry.advance?.toString() || "0") || 0;
+      const breakage = parseFloat(entry.breakage?.toString() || "0") || 0;
+      const shopAmount = parseFloat(entry.shopAmountOne?.toString() || "0") || 0;
+      const medical = parseFloat(entry.medicalAmount?.toString() || "0") || 0;
+      // Also check if descriptions contain numbers (like Incentive Name discrepancy)
+      const advanceName = parseFloat(entry.advanceName?.toString() || "0") || 0;
+      const breakageName = parseFloat(entry.breakageName?.toString() || "0") || 0;
+      const shopName = parseFloat(entry.shopNameOne?.toString() || "0") || 0;
+      const medicalName = parseFloat(entry.medicalPersonName?.toString() || "0") || 0;
+      return sum + advance + breakage + shopAmount + medical + advanceName + breakageName + shopName + medicalName;
+    }, 0);
 
-    const sum = [
-      parseFloat(formData.openingQty) || 0,
+    const expenseSum = [
       parseFloat(formData.teaNasta) || 0,
       parseFloat(formData.waterJar) || 0,
       parseFloat(formData.lightBill) || 0,
@@ -158,20 +162,21 @@ export default function PettyCashModal({
       parseFloat(formData.incentive) || 0,
       parseFloat(formData.excisePolice) || 0,
       parseFloat(formData.desiBhada) || 0,
-      parseFloat(formData.otherVendorPayment) || 0,
-      parseFloat(formData.differenceAmount) || 0,
       parseFloat(formData.petrol) || 0,
       parseFloat(formData.patilPetrol) || 0,
       parseFloat(formData.roomExpense) || 0,
       parseFloat(formData.officeExpense) || 0,
       parseFloat(formData.personalExpense) || 0,
       parseFloat(formData.miscExpense) || 0,
-      parseFloat(formData.closing) || 0,
+      parseFloat(formData.incentiveName) || 0, // Adding Incentive Name as it's used for amounts (e.g. the 686 discrepancy)
       parseFloat(formData.creditCardCharges) || 0,
       otherExpensesTotal,
-
     ].reduce((acc, val) => acc + val, 0);
-    setTotalAmount(sum);
+
+    const grandTotal = expenseSum + (parseFloat(formData.openingQty) || 0) + (parseFloat(formData.otherVendorPayment) || 0) + (parseFloat(formData.differenceAmount) || 0);
+
+    setTotalExpense(expenseSum);
+    setTotalAmount(grandTotal);
   }, [formData]);
 
   const fetchUsernames = async () => {
@@ -204,13 +209,13 @@ export default function PettyCashModal({
         let shopNames = result.data
           .map((row: any[]) => row[3]) // Column D
           .filter((name: string) => !!name && name.toLowerCase() !== "shop name");
-          
+
         // Explicitly ensure 'KUNAL ULWE' is present if missing or if API skipped it
         shopNames = ["KUNAL ULWE", ...shopNames];
-        
+
         // Remove duplicates
         const uniqueShops = Array.from(new Set(shopNames)) as string[];
-          
+
         setFetchedShopNames(uniqueShops);
       } else {
         console.error("Error fetching shop names:", result.error);
@@ -262,7 +267,7 @@ export default function PettyCashModal({
           date: new Date().toISOString().split("T")[0],
         });
       }
-      fetchUsernames(); 
+      fetchUsernames();
       fetchShopNames();
     }
   }, [isOpen, initialData]);
@@ -335,7 +340,7 @@ export default function PettyCashModal({
 
         if (result.success && Array.isArray(result.data)) {
           let maxNumber = 0;
-          
+
           // Column index 1 is 'Patty Id' (Column B)
           result.data.forEach((row: any[]) => {
             const id = row[1];
@@ -346,7 +351,7 @@ export default function PettyCashModal({
               }
             }
           });
-          
+
           generatedId = `PT-${String(maxNumber + 1).padStart(2, '0')}`;
         } else {
           generatedId = 'PT-01';
@@ -409,64 +414,64 @@ export default function PettyCashModal({
       // Otherwise, submit one row with empty other expense fields
       const rowsToSubmit = formData.otherExpenses.length > 0
         ? formData.otherExpenses.map((entry, idx) => {
-            const isFirst = idx === 0;
-            const emptyBase = new Array(baseData.length).fill("");
-            
-            return [
-              ...(isFirst ? baseData : emptyBase),
-              entry.advance || "",
-              entry.advanceName || "",
-              entry.breakage || "",
-              entry.breakageName || "",
-              entry.shopNameOne || "",
-              entry.shopAmountOne || "",
-              entry.medicalPersonName || "",
-              entry.medicalAmount || "",
-              isFirst ? (formData.excisePolice || "") : "",
-              isFirst ? (formData.desiBhada || "") : "",
-              isFirst ? (formData.roomExpense || "") : "",
-              isFirst ? (formData.officeExpense || "") : "",
-              isFirst ? (formData.personalExpense || "") : "",
-              isFirst ? (formData.miscExpense || "") : "",
-              isFirst ? (formData.miscRemarks || "") : "",
-              isFirst ? (formData.otherPurchaseVoucherNo || "") : "",
-              isFirst ? (formData.otherVendorPayment || "") : "",
-              isFirst ? (formData.differenceAmount || "") : "",
-              isFirst ? (formData.creditCardCharges || "") : "",
-              isFirst ? (formData.username || "") : "",
-              "", // Column AM (Index 38) - No data stored as it has external formula
-              isFirst ? (formData.transactionStatus || "") : "", // Column AN (Index 39)
-              isFirst ? (otherExpensesStageTotal !== "0.00" ? otherExpensesStageTotal : "") : "", // Column AO (Index 40)
-            ];
-          })
-        : [
-            [
-              ...baseData,
-              "", // advance
-              "",  // advanceName
-              "", // breakage
-              "",  // breakageName
-              "",  // shopNameOne
-              "", // shopAmountOne
-              "",  // medicalPersonName
-              "", // medicalAmount
-              formData.excisePolice || "",
-              formData.desiBhada || "",
-              formData.roomExpense || "",
-              formData.officeExpense || "",
-              formData.personalExpense || "",
-              formData.miscExpense || "",
-              formData.miscRemarks || "",
-              formData.otherPurchaseVoucherNo || "",
-              formData.otherVendorPayment || "",
-              formData.differenceAmount || "",
-              formData.creditCardCharges || "",
-              formData.username || "",
-              "", // Column AM (Index 38) - No data stored
-              formData.transactionStatus || "", // Column AN (Index 39)
-              otherExpensesStageTotal !== "0.00" ? otherExpensesStageTotal : "", // Column AO (Index 40)
-            ],
+          const isFirst = idx === 0;
+          const emptyBase = new Array(baseData.length).fill("");
+
+          return [
+            ...(isFirst ? baseData : emptyBase),
+            entry.advance || "",
+            entry.advanceName || "",
+            entry.breakage || "",
+            entry.breakageName || "",
+            entry.shopNameOne || "",
+            entry.shopAmountOne || "",
+            entry.medicalPersonName || "",
+            entry.medicalAmount || "",
+            isFirst ? (formData.excisePolice || "") : "",
+            isFirst ? (formData.desiBhada || "") : "",
+            isFirst ? (formData.roomExpense || "") : "",
+            isFirst ? (formData.officeExpense || "") : "",
+            isFirst ? (formData.personalExpense || "") : "",
+            isFirst ? (formData.miscExpense || "") : "",
+            isFirst ? (formData.miscRemarks || "") : "",
+            isFirst ? (formData.otherPurchaseVoucherNo || "") : "",
+            isFirst ? (formData.otherVendorPayment || "") : "",
+            isFirst ? (formData.differenceAmount || "") : "",
+            isFirst ? (formData.creditCardCharges || "") : "",
+            isFirst ? (formData.username || "") : "",
+            isFirst ? totalExpense.toFixed(2) : "", // Column AM (Index 38) - Total Exp. (Spent)
+            isFirst ? (formData.transactionStatus || "") : "", // Column AN (Index 39)
+            isFirst ? totalAmount.toFixed(2) : "", // Column AO (Index 40) - Total Amount (Grand Total)
           ];
+        })
+        : [
+          [
+            ...baseData,
+            "", // advance
+            "",  // advanceName
+            "", // breakage
+            "",  // breakageName
+            "",  // shopNameOne
+            "", // shopAmountOne
+            "",  // medicalPersonName
+            "", // medicalAmount
+            formData.excisePolice || "",
+            formData.desiBhada || "",
+            formData.roomExpense || "",
+            formData.officeExpense || "",
+            formData.personalExpense || "",
+            formData.miscExpense || "",
+            formData.miscRemarks || "",
+            formData.otherPurchaseVoucherNo || "",
+            formData.otherVendorPayment || "",
+            formData.differenceAmount || "",
+            formData.creditCardCharges || "",
+            formData.username || "",
+            totalExpense.toFixed(2), // Column AM (Index 38) - Total Exp. (Spent)
+            formData.transactionStatus || "", // Column AN (Index 39)
+            totalAmount.toFixed(2), // Column AO (Index 40) - Total Amount (Grand Total)
+          ],
+        ];
 
       // Submit all rows
       for (const rowData of rowsToSubmit) {
@@ -577,52 +582,49 @@ export default function PettyCashModal({
                   <label className="block mb-2 text-sm font-semibold text-gray-700">
                     Shop Name
                   </label>
-                  
+
                   <div
                     onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
-                    className={`w-full px-4 py-3 bg-white border rounded-lg cursor-pointer flex justify-between items-center transition-all ${
-                      isShopDropdownOpen
-                        ? "border-[#2a5298] ring-2 ring-[#2a5298] ring-opacity-20"
-                        : "border-gray-300 hover:border-blue-400"
-                    }`}
+                    className={`w-full px-4 py-3 bg-white border rounded-lg cursor-pointer flex justify-between items-center transition-all ${isShopDropdownOpen
+                      ? "border-[#2a5298] ring-2 ring-[#2a5298] ring-opacity-20"
+                      : "border-gray-300 hover:border-blue-400"
+                      }`}
                   >
                     <span className={formData.shopName ? "text-gray-900" : "text-gray-400"}>
                       {formData.shopName || "Select Shop Name"}
                     </span>
                     <FaChevronDown
-                      className={`text-gray-400 text-sm transition-transform duration-200 ${
-                        isShopDropdownOpen ? "transform rotate-180" : ""
-                      }`}
+                      className={`text-gray-400 text-sm transition-transform duration-200 ${isShopDropdownOpen ? "transform rotate-180" : ""
+                        }`}
                     />
                   </div>
 
                   {isShopDropdownOpen && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden animate-fadeIn">
-                       <ul className="max-h-60 overflow-y-auto hide-scrollbar">
-                         {fetchedShopNames.length > 0 ? (
-                           fetchedShopNames.map((shop, index) => (
-                             <li
-                               key={index}
-                               onClick={() => {
-                                 setFormData({ ...formData, shopName: shop });
-                                 setIsShopDropdownOpen(false);
-                               }}
-                               className={`px-4 py-3 text-sm cursor-pointer border-b border-gray-50 last:border-none flex items-center justify-between transition-colors ${
-                                 formData.shopName === shop
-                                   ? "bg-blue-50 text-[#2a5298] font-medium"
-                                   : "text-gray-700 hover:bg-gray-50"
-                               }`}
-                             >
-                               {shop}
-                               {formData.shopName === shop && <FaCheck className="text-xs" />}
-                             </li>
-                           ))
-                         ) : (
-                           <li className="px-4 py-3 text-sm text-gray-500 text-center">
-                             No shops found
-                           </li>
-                         )}
-                       </ul>
+                      <ul className="max-h-60 overflow-y-auto hide-scrollbar">
+                        {fetchedShopNames.length > 0 ? (
+                          fetchedShopNames.map((shop, index) => (
+                            <li
+                              key={index}
+                              onClick={() => {
+                                setFormData({ ...formData, shopName: shop });
+                                setIsShopDropdownOpen(false);
+                              }}
+                              className={`px-4 py-3 text-sm cursor-pointer border-b border-gray-50 last:border-none flex items-center justify-between transition-colors ${formData.shopName === shop
+                                ? "bg-blue-50 text-[#2a5298] font-medium"
+                                : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                            >
+                              {shop}
+                              {formData.shopName === shop && <FaCheck className="text-xs" />}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="px-4 py-3 text-sm text-gray-500 text-center">
+                            No shops found
+                          </li>
+                        )}
+                      </ul>
                     </div>
                   )}
                 </div>
@@ -1283,10 +1285,18 @@ export default function PettyCashModal({
 
 
 
-          <div className="mt-6 p-4 bg-[#f5f7fa] rounded-lg border border-gray-200">
+          <div className="mt-6 p-4 bg-[#f5f7fa] rounded-lg border border-gray-200 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <span className="text-lg font-semibold text-gray-600">
+                Total Exp. (Spent):
+              </span>
+              <span className="text-2xl font-bold text-red-600">
+                ₹{totalExpense.toFixed(2)}
+              </span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-700">
-                Total Amount:
+                Total Amount (Grand Total):
               </span>
               <span className="text-2xl font-bold text-[#2a5298]">
                 ₹{totalAmount.toFixed(2)}

@@ -559,8 +559,8 @@ export default function TransactionHistory() {
             <button
               onClick={() => setActiveTab("petty-cash")}
               className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === "petty-cash"
-                  ? "border-b-2 border-[#2a5298] text-[#2a5298]"
-                  : "text-gray-500 hover:text-gray-700"
+                ? "border-b-2 border-[#2a5298] text-[#2a5298]"
+                : "text-gray-500 hover:text-gray-700"
                 }`}
             >
               Petty Cash History
@@ -568,8 +568,8 @@ export default function TransactionHistory() {
             <button
               onClick={() => setActiveTab("cash-tally")}
               className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === "cash-tally"
-                  ? "border-b-2 border-[#2a5298] text-[#2a5298]"
-                  : "text-gray-500 hover:text-gray-700"
+                ? "border-b-2 border-[#2a5298] text-[#2a5298]"
+                : "text-gray-500 hover:text-gray-700"
                 }`}
             >
               Cash Tally History
