@@ -1,0 +1,15 @@
+﻿
+> vite-react-typescript-starter@0.0.0 typecheck
+> tsc --noEmit -p tsconfig.app.json
+
+src/components/PettyCashModal.tsx(367,13): error TS6133: 'otherExpensesStageTotal' is declared but its value is never read.
+src/pages/Dashboard.tsx(1162,5): error TS2322: Type '{ id: any; rowIndex: number; date: string; name: any; openingQty: any; closing: any; teaNasta: any; waterJar: any; lightBill: any; recharge: any; postOffice: any; customerDiscount: any; repairMaintenance: any; ... 22 more ...; sheetName: string; }[]' is not assignable to type 'Transaction[]'.
+  Property 'incentiveName' is missing in type '{ id: any; rowIndex: number; date: string; name: any; openingQty: any; closing: any; teaNasta: any; waterJar: any; lightBill: any; recharge: any; postOffice: any; customerDiscount: any; repairMaintenance: any; ... 22 more ...; sheetName: string; }' but required in type 'Transaction'.
+src/pages/Reports.tsx(18,3): error TS6133: 'FaCheck' is declared but its value is never read.
+src/pages/Reports.tsx(19,3): error TS6133: 'FaTimes' is declared but its value is never read.
+src/pages/TransactionHistory.tsx(405,1): error TS6192: All imports in import declaration are unused.
+src/pages/TransactionHistory.tsx(463,27): error TS2345: Argument of type 'any[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type 'any[]' is not assignable to type 'never[]'.
+    Type 'any' is not assignable to type 'never'.
+src/pages/TransactionHistory.tsx(711,9): error TS2322: Type 'Transaction | undefined' is not assignable to type 'CategoryAmounts | undefined'.
+  Type 'Transaction' is missing the following properties from type 'CategoryAmounts': username, shopName, otherExpenses, miscRemarks

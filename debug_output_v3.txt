@@ -1,0 +1,7 @@
+Fetching from: https://script.google.com/macros/s/AKfycbx5dryxS1R5zp6myFfUlP1QPimufTqh5hcPcFMNcAJ-FiC-hyQL9mCkgHSbLkOiWTibeg/exec?sheet=Login&action=fetch
+Header Row: ["SUNIL KISHAN SHEDKE","SAGAR","sagar@123","User","petty-cash,cash-tally,cash-tally-3","TLS ULWE","",""]
+ANGAD row: ["ANGAD PRAJAPATI","ANGAD","angad123","Admin","all","KUNAL ULWE","",""]
+SAGAR row: ["Sagar Verma","SUNIL","sunil@123","Manager","dashboard,petty-cash,cash-tally,cash-tally-2","FRIENDS, OFFICE,TLS","",""]
+Detected Indices - User ID: -1, Password: -1
+ANGAD ID: "undefined", PASS: "undefined"
+SAGAR ID: "undefined", PASS: "undefined"
